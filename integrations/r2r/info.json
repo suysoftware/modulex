@@ -1,0 +1,112 @@
+{
+    "name": "r2r",
+    "display_name": "R2R Retrieval System",
+    "description": "R2R (RAG to Riches) is a production-ready, scalable retrieval-augmented generation system",
+    "version": "1.0.0",
+    "author": "ModuleX",
+    "requires_auth": true,
+    "auth_type": "api_key_or_credentials",
+    "environment_variables": [
+      {
+        "name": "R2R_API_BASE",
+        "description": "R2R API base URL",
+        "required": true
+      },
+      {
+        "name": "R2R_BASE_URL",
+        "description": "R2R base URL",
+        "required": true
+      },
+      {
+        "name": "R2R_API_KEY",
+        "description": "R2R API key (alternative to email/password)",
+        "required": false
+      },
+      {
+        "name": "R2R_EMAIL",
+        "description": "R2R login email",
+        "required": false
+      },
+      {
+        "name": "R2R_PASSWORD",
+        "description": "R2R login password",
+        "required": false
+      }
+    ],
+    "actions": [
+      {
+        "name": "search",
+        "description": "Perform a vector search in the R2R knowledge base",
+        "parameters": {
+          "query": {
+            "type": "string",
+            "description": "The search query",
+            "required": true
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Number of results to return",
+            "default": 10,
+            "optional": true
+          }
+        }
+      },
+      {
+        "name": "rag",
+        "description": "Perform a Retrieval-Augmented Generation query",
+        "parameters": {
+          "query": {
+            "type": "string",
+            "description": "The question to answer using the knowledge base",
+            "required": true
+          },
+          "use_hybrid": {
+            "type": "boolean",
+            "description": "Use hybrid search",
+            "default": false,
+            "optional": true
+          },
+          "use_kg": {
+            "type": "boolean",
+            "description": "Use knowledge graph",
+            "default": false,
+            "optional": true
+          }
+        }
+      },
+      {
+        "name": "list_documents",
+        "description": "List documents in the R2R system",
+        "parameters": {
+          "limit": {
+            "type": "integer",
+            "description": "Number of documents to return",
+            "default": 10,
+            "optional": true
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset for pagination",
+            "default": 0,
+            "optional": true
+          }
+        }
+      },
+      {
+        "name": "get_document",
+        "description": "Get detailed information about a specific document",
+        "parameters": {
+          "document_id": {
+            "type": "string",
+            "description": "The ID of the document to retrieve",
+            "required": true
+          }
+        }
+      },
+      {
+        "name": "list_collections",
+        "description": "List collections in the R2R system",
+        "parameters": {}
+      }
+    ]
+  } 

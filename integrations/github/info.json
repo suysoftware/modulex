@@ -1,0 +1,50 @@
+{
+    "name": "github",
+    "display_name": "GitHub",
+    "description": "GitHub repository and user management",
+    "version": "1.0.0",
+    "author": "ModuleX",
+    "requires_auth": true,
+    "auth_type": "oauth2",
+    "actions": [
+      {
+        "name": "list_repositories",
+        "description": "List user's GitHub repositories",
+        "parameters": {
+          "per_page": {
+            "type": "integer",
+            "description": "Number of repositories per page",
+            "default": 30,
+            "optional": true
+          }
+        }
+      },
+      {
+        "name": "create_repository",
+        "description": "Create a new GitHub repository",
+        "parameters": {
+          "name": {
+            "type": "string",
+            "description": "Repository name",
+            "required": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Repository description",
+            "optional": true
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether repository should be private",
+            "default": false,
+            "optional": true
+          }
+        }
+      },
+      {
+        "name": "get_user_info",
+        "description": "Get authenticated user information",
+        "parameters": {}
+      }
+    ]
+  } 
