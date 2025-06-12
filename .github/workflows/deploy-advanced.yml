@@ -92,7 +92,7 @@ jobs:
           echo "🔍 Pre-deployment checks..."
           
           # Check if docker-compose.yml exists
-          if [ ! -f "docker-compose.yml" ]; then
+          if [ ! -f "docker/docker-compose.yml" ]; then
             echo "❌ docker-compose.yml not found!"
             exit 1
           fi
@@ -108,7 +108,7 @@ jobs:
           
           # Stop services gracefully
           echo "🛑 Stopping services..."
-          docker-compose down --timeout 30
+          docker-compose -f docker/docker-compose.yml down --timeout 30
 
           df -h
           free -m
@@ -120,11 +120,11 @@ jobs:
           
           # Build new images
           echo "🔨 Building new images..."
-          docker-compose build --no-cache --parallel
+          docker-compose -f docker/docker-compose.yml build --no-cache --parallel
           
           # Start services
           echo "▶️ Starting services..."
-          docker-compose up -d
+          docker-compose -f docker/docker-compose.yml up -d
           
           # Simple wait
           echo "⏳ Waiting for services to stabilize..."
@@ -133,7 +133,7 @@ jobs:
           # Show final status
           echo "📊 Deployment Summary:"
           echo "=========================="
-          docker-compose ps
+          docker-compose -f docker/docker-compose.yml ps
           echo ""
           echo "🎉 Deployment completed!"
 
