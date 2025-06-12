@@ -66,11 +66,6 @@ jobs:
           
           cd "$PROJECT_DIR"
           
-          # Backup current state
-          echo "💾 Creating backup..."
-          BACKUP_DIR="~/backups/modulex-$(date +%Y%m%d_%H%M%S)"
-          mkdir -p ~/backups
-          cp -r . "$BACKUP_DIR" || echo "⚠️ Backup failed, continuing..."
           
           # Git operations
           echo "📥 Fetching latest changes"
@@ -98,6 +93,7 @@ jobs:
           fi
           
           rm -f /home/${{ secrets.USERNAME }}/modulex/docker/env/modulex.env
+          mkdir -p /home/${{ secrets.USERNAME }}/modulex/docker/env
           echo '${{ secrets.MODULEX_ENV }}' > /home/${{ secrets.USERNAME }}/modulex/docker/env/modulex.env
           
           # Check if .env exists, create from example if not
