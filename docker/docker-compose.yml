@@ -102,7 +102,7 @@ services:
   # Main Application
   app:
     build:
-      context: .
+      context: ../py
       dockerfile: Dockerfile
     container_name: modulex
     ports:
