@@ -140,13 +140,13 @@ jobs:
         echo "$CHANGES" >> release_notes.md
         echo "" >> release_notes.md
         echo "### 📦 Docker Images" >> release_notes.md
-        echo "- your-username/modulex:latest" >> release_notes.md
-        echo "- your-username/modulex:v$NEW_VERSION" >> release_notes.md
+        echo "- ${{ secrets.DOCKER_IMAGE }}:latest" >> release_notes.md
+        echo "- ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION" >> release_notes.md
         echo "" >> release_notes.md
         echo "### 🔧 Installation" >> release_notes.md
         echo '```bash' >> release_notes.md
-        echo "docker pull your-username/modulex:v$NEW_VERSION" >> release_notes.md
-        echo "docker run -p 8000:8000 your-username/modulex:v$NEW_VERSION" >> release_notes.md
+        echo "docker pull ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION" >> release_notes.md
+        echo "docker run -p 8000:8000 ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION" >> release_notes.md
         echo '```' >> release_notes.md
         echo "" >> release_notes.md
         echo "### 📖 Documentation" >> release_notes.md
