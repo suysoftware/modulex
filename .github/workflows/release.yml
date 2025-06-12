@@ -35,7 +35,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install toml bump2version
+        pip install toml
     
     - name: Configure Git
       run: |
@@ -70,53 +70,39 @@ jobs:
       id: bump-version
       run: |
         cd py
-        
-        # Version'ı bump et
-        case "${{ steps.version-type.outputs.type }}" in
-          "major")
-            python -c "
+        python << 'EOF'
 import toml
+import os
+
+# Config dosyasını oku
 config = toml.load('pyproject.toml')
-version = config['project']['version']
-major, minor, patch = map(int, version.split('.'))
-new_version = f'{major + 1}.0.0'
+current_version = config['project']['version']
+major, minor, patch = map(int, current_version.split('.'))
+
+# Version type'ı al
+version_type = "${{ steps.version-type.outputs.type }}"
+
+# Yeni version hesapla
+if version_type == 'major':
+    new_version = f'{major + 1}.0.0'
+elif version_type == 'minor':
+    new_version = f'{major}.{minor + 1}.0'
+else:  # patch
+    new_version = f'{major}.{minor}.{patch + 1}'
+
+# Config dosyasını güncelle
 config['project']['version'] = new_version
+
+# Dosyayı kaydet
 with open('pyproject.toml', 'w') as f:
     toml.dump(config, f)
-print(f'New version: {new_version}')
-" > version_output.txt
-            ;;
-          "minor")
-            python -c "
-import toml
-config = toml.load('pyproject.toml')
-version = config['project']['version']
-major, minor, patch = map(int, version.split('.'))
-new_version = f'{major}.{minor + 1}.0'
-config['project']['version'] = new_version
-with open('pyproject.toml', 'w') as f:
-    toml.dump(config, f)
-print(f'New version: {new_version}')
-" > version_output.txt
-            ;;
-          "patch")
-            python -c "
-import toml
-config = toml.load('pyproject.toml')
-version = config['project']['version']
-major, minor, patch = map(int, version.split('.'))
-new_version = f'{major}.{minor}.{patch + 1}'
-config['project']['version'] = new_version
-with open('pyproject.toml', 'w') as f:
-    toml.dump(config, f)
-print(f'New version: {new_version}')
-" > version_output.txt
-            ;;
-        esac
-        
-        NEW_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "New version: $NEW_VERSION"
+
+print(f'Version updated from {current_version} to {new_version}')
+
+# GitHub output'a yaz
+with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+    f.write(f'version={new_version}\n')
+EOF
     
     - name: Create changelog entry
       run: |
@@ -130,7 +116,7 @@ print(f'New version: {new_version}')
         fi
         
         # Geçici dosya oluştur
-        cat > temp_changelog.md << EOF
+        cat > temp_changelog.md << 'EOF'
 # Changelog
 
 ## [${NEW_VERSION}] - ${DATE}
@@ -140,12 +126,29 @@ $(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~1
 
 EOF
         
+        # Variable substitution yap
+        sed -i "s/\${NEW_VERSION}/$NEW_VERSION/g" temp_changelog.md
+        sed -i "s/\${DATE}/$DATE/g" temp_changelog.md
+        
+        # Git log'u ekle
+        CHANGES=$(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD 2>/dev/null | sed 's/^/- /' || echo "- Initial release")
+        
+        # Changelog'u güncelle
+        echo "# Changelog" > final_changelog.md
+        echo "" >> final_changelog.md
+        echo "## [$NEW_VERSION] - $DATE" >> final_changelog.md
+        echo "" >> final_changelog.md
+        echo "### Changes" >> final_changelog.md
+        echo "$CHANGES" >> final_changelog.md
+        echo "" >> final_changelog.md
+        
         # Mevcut changelog'u ekle (ilk satır hariç)
         if [ -f CHANGELOG.md ]; then
-          tail -n +2 CHANGELOG.md >> temp_changelog.md
+          tail -n +2 CHANGELOG.md >> final_changelog.md
         fi
         
-        mv temp_changelog.md CHANGELOG.md
+        mv final_changelog.md CHANGELOG.md
+        rm -f temp_changelog.md
     
     - name: Commit changes
       run: |
@@ -169,34 +172,37 @@ EOF
           CHANGES=$(git log --pretty=format:"- %s" --max-count=10)
         fi
         
-        cat > release_notes.md << EOF
-        ## 🚀 What's New in v${{ steps.bump-version.outputs.version }}
+        cat > release_notes.md << 'EOF'
+## 🚀 What's New in v${{ steps.bump-version.outputs.version }}
+
+### Changes
+CHANGES_PLACEHOLDER
+
+### 📦 Docker Images
+- `your-username/modulex:latest`
+- `your-username/modulex:v${{ steps.bump-version.outputs.version }}`
+
+### 🔧 Installation
+```bash
+docker pull your-username/modulex:v${{ steps.bump-version.outputs.version }}
+docker run -p 8000:8000 your-username/modulex:v${{ steps.bump-version.outputs.version }}
+```
+
+### 📖 Documentation
+- [GitHub Repository](https://github.com/suysoftware/modulex)
+- [API Documentation](http://localhost:8000/docs)
+EOF
         
-        ### Changes
-        $CHANGES
-        
-        ### 📦 Docker Images
-        - \`suysoftware/modulex:latest\`
-        - \`suysoftware/modulex:v${{ steps.bump-version.outputs.version }}\`
-        
-        ### 🔧 Installation
-        \`\`\`bash
-        docker pull suysoftware/modulex:v${{ steps.bump-version.outputs.version }}
-        docker run -p 8000:8000 suysoftware/modulex:v${{ steps.bump-version.outputs.version }}
-        \`\`\`
-        
-        ### 📖 Documentation
-        - [GitHub Repository](https://github.com/suysoftware/modulex)
-        - [API Documentation](http://localhost:8000/docs)
-        EOF
+        # Changes'ı yerleştir
+        sed -i "s/CHANGES_PLACEHOLDER/$CHANGES/g" release_notes.md
     
     - name: Create GitHub Release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ steps.bump-version.outputs.version }}
-        release_name: Release v${{ steps.bump-version.outputs.version }}
+        name: Release v${{ steps.bump-version.outputs.version }}
         body_path: release_notes.md
         draft: false
         prerelease: false 
