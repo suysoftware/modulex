@@ -18,7 +18,6 @@ on:
 permissions:
   contents: write
   actions: read
-  metadata: read
 
 jobs:
   release:
