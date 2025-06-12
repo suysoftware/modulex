@@ -1,63 +1,27 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = [ "setuptools>=61.0", "wheel",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "modulex"
-version = "0.1.0"
+version = "0.1.1"
 description = "ModuleX is a simple tool authentication and execution server"
-authors = [
-    {name = "ModuleX", email = "info@modulex.dev"}
-]
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.9"
-keywords = ["mcp", "tools", "authentication", "oauth", "api"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-]
+keywords = [ "mcp", "tools", "authentication", "oauth", "api",]
+classifiers = [ "Development Status :: 4 - Beta", "Intended Audience :: Developers", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.9", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12",]
+dependencies = [ "fastapi>=0.104.1", "uvicorn[standard]>=0.24.0", "sqlalchemy[asyncio]>=2.0.23", "asyncpg>=0.29.0", "cryptography>=41.0.7", "httpx>=0.25.2", "pydantic>=2.5.0", "requests>=2.31.0", "redis>=5.0.1", "r2r>=3.0.0",]
+[[project.authors]]
+name = "ModuleX"
+email = "info@modulex.dev"
 
-dependencies = [
-    "fastapi>=0.104.1",
-    "uvicorn[standard]>=0.24.0",
-    "sqlalchemy[asyncio]>=2.0.23",
-    "asyncpg>=0.29.0",
-    "cryptography>=41.0.7",
-    "httpx>=0.25.2",
-    "pydantic>=2.5.0",
-    "requests>=2.31.0",
-    "redis>=5.0.1",
-    "r2r>=3.0.0",
-]
+[project.license]
+text = "MIT"
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.5.0",
-]
-
-test = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "httpx>=0.25.2",
-]
-
-production = [
-    "gunicorn>=21.2.0",
-    "redis>=5.0.0",
-]
+dev = [ "pytest>=7.4.0", "pytest-asyncio>=0.21.0", "pytest-cov>=4.1.0", "black>=23.0.0", "ruff>=0.1.0", "mypy>=1.5.0",]
+test = [ "pytest>=7.4.0", "pytest-asyncio>=0.21.0", "pytest-cov>=4.1.0", "httpx>=0.25.2",]
+production = [ "gunicorn>=21.2.0", "redis>=5.0.0",]
 
 [project.urls]
 Homepage = "https://github.com/suysoftware/modulex"
@@ -69,48 +33,17 @@ Issues = "https://github.com/suysoftware/modulex/issues"
 modulex = "app.main:main"
 modulex-dev = "scripts:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["app*", "integrations*"]
-
 [tool.black]
 line-length = 100
-target-version = ["py39", "py310", "py311", "py312"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
+target-version = [ "py39", "py310", "py311", "py312",]
+include = "\\.pyi?$"
+extend-exclude = "/(\n  # directories\n  \\.eggs\n  | \\.git\n  | \\.hg\n  | \\.mypy_cache\n  | \\.tox\n  | \\.venv\n  | build\n  | dist\n)/\n"
 
 [tool.ruff]
 target-version = "py39"
 line-length = 100
-select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-]
-ignore = [
-    "E501",  # line too long, handled by black
-    "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
-]
-
-[tool.ruff.per-file-ignores]
-"__init__.py" = ["F401"]
+select = [ "E", "W", "F", "I", "B", "C4", "UP",]
+ignore = [ "E501", "B008", "C901",]
 
 [tool.mypy]
 python_version = "3.9"
@@ -121,46 +54,26 @@ disallow_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-
 [[tool.mypy.overrides]]
-module = [
-    "requests.*",
-    "sqlalchemy.*",
-    "asyncpg.*",
-]
+module = [ "requests.*", "sqlalchemy.*", "asyncpg.*",]
 ignore_missing_imports = true
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = [ "F401",]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--cov=app",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-report=xml",
-]
-testpaths = ["tests"]
+addopts = [ "--strict-markers", "--strict-config", "--cov=app", "--cov-report=term-missing", "--cov-report=html", "--cov-report=xml",]
+testpaths = [ "tests",]
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["app"]
-omit = [
-    "*/tests/*",
-    "*/test_*",
-    "*/__init__.py",
-]
+source = [ "app",]
+omit = [ "*/tests/*", "*/test_*", "*/__init__.py",]
 
 [tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
-] 
+exclude_lines = [ "pragma: no cover", "def __repr__", "if self.debug:", "if settings.DEBUG", "raise AssertionError", "raise NotImplementedError", "if 0:", "if __name__ == .__main__.:", "class .*\\bProtocol\\):", "@(abc\\.)?abstractmethod",]
+
+[tool.setuptools.packages.find]
+where = [ ".",]
+include = [ "app*", "integrations*",]
