@@ -69,21 +69,21 @@ jobs:
       id: bump-version
       run: |
         python -c "
-import toml, sys, os
-version_type = '${{ steps.version-type.outputs.type }}'
-config = toml.load('py/pyproject.toml')
-current_version = config['project']['version']
-major, minor, patch = map(int, current_version.split('.'))
-if version_type == 'major':
-    new_version = f'{major + 1}.0.0'
-elif version_type == 'minor':
-    new_version = f'{major}.{minor + 1}.0'
-else:
-    new_version = f'{major}.{minor}.{patch + 1}'
-config['project']['version'] = new_version
-with open('py/pyproject.toml', 'w') as f:
-    toml.dump(config, f)
-print(f'version={new_version}')
+        import toml, sys, os
+        version_type = '${{ steps.version-type.outputs.type }}'
+        config = toml.load('py/pyproject.toml')
+        current_version = config['project']['version']
+        major, minor, patch = map(int, current_version.split('.'))
+        if version_type == 'major':
+            new_version = f'{major + 1}.0.0'
+        elif version_type == 'minor':
+            new_version = f'{major}.{minor + 1}.0'
+        else:
+            new_version = f'{major}.{minor}.{patch + 1}'
+        config['project']['version'] = new_version
+        with open('py/pyproject.toml', 'w') as f:
+            toml.dump(config, f)
+        print(f'version={new_version}')
         " > version_output.txt
         NEW_VERSION=$(cat version_output.txt | grep "version=" | cut -d'=' -f2)
         echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
