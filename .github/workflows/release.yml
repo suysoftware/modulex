@@ -1,0 +1,202 @@
+name: Release and Version Bump
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install toml bump2version
+    
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+    
+    - name: Determine version bump type
+      id: version-type
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "type=${{ github.event.inputs.version_type }}" >> $GITHUB_OUTPUT
+        else
+          # Commit mesajlarına göre version type belirle
+          COMMITS=$(git log --oneline $(git describe --tags --abbrev=0)..HEAD 2>/dev/null || git log --oneline)
+          
+          if echo "$COMMITS" | grep -i -E "(breaking|major)"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif echo "$COMMITS" | grep -i -E "(feat|feature|minor)"; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+        fi
+    
+    - name: Get current version
+      id: current-version
+      run: |
+        CURRENT_VERSION=$(python -c "import toml; print(toml.load('py/pyproject.toml')['project']['version'])")
+        echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+    
+    - name: Bump version
+      id: bump-version
+      run: |
+        cd py
+        
+        # Version'ı bump et
+        case "${{ steps.version-type.outputs.type }}" in
+          "major")
+            python -c "
+import toml
+config = toml.load('pyproject.toml')
+version = config['project']['version']
+major, minor, patch = map(int, version.split('.'))
+new_version = f'{major + 1}.0.0'
+config['project']['version'] = new_version
+with open('pyproject.toml', 'w') as f:
+    toml.dump(config, f)
+print(f'New version: {new_version}')
+" > version_output.txt
+            ;;
+          "minor")
+            python -c "
+import toml
+config = toml.load('pyproject.toml')
+version = config['project']['version']
+major, minor, patch = map(int, version.split('.'))
+new_version = f'{major}.{minor + 1}.0'
+config['project']['version'] = new_version
+with open('pyproject.toml', 'w') as f:
+    toml.dump(config, f)
+print(f'New version: {new_version}')
+" > version_output.txt
+            ;;
+          "patch")
+            python -c "
+import toml
+config = toml.load('pyproject.toml')
+version = config['project']['version']
+major, minor, patch = map(int, version.split('.'))
+new_version = f'{major}.{minor}.{patch + 1}'
+config['project']['version'] = new_version
+with open('pyproject.toml', 'w') as f:
+    toml.dump(config, f)
+print(f'New version: {new_version}')
+" > version_output.txt
+            ;;
+        esac
+        
+        NEW_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: $NEW_VERSION"
+    
+    - name: Create changelog entry
+      run: |
+        NEW_VERSION="${{ steps.bump-version.outputs.version }}"
+        DATE=$(date +%Y-%m-%d)
+        
+        # Changelog oluştur veya güncelle
+        if [ ! -f CHANGELOG.md ]; then
+          echo "# Changelog" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+        fi
+        
+        # Geçici dosya oluştur
+        cat > temp_changelog.md << EOF
+# Changelog
+
+## [${NEW_VERSION}] - ${DATE}
+
+### Changes
+$(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD 2>/dev/null | sed 's/^/- /')
+
+EOF
+        
+        # Mevcut changelog'u ekle (ilk satır hariç)
+        if [ -f CHANGELOG.md ]; then
+          tail -n +2 CHANGELOG.md >> temp_changelog.md
+        fi
+        
+        mv temp_changelog.md CHANGELOG.md
+    
+    - name: Commit changes
+      run: |
+        git add .
+        git commit -m "🔖 Bump version to ${{ steps.bump-version.outputs.version }}"
+        git push origin main
+    
+    - name: Create tag
+      run: |
+        git tag -a "v${{ steps.bump-version.outputs.version }}" -m "Release v${{ steps.bump-version.outputs.version }}"
+        git push origin "v${{ steps.bump-version.outputs.version }}"
+    
+    - name: Generate release notes
+      id: release-notes
+      run: |
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        
+        if [ -n "$PREVIOUS_TAG" ]; then
+          CHANGES=$(git log --pretty=format:"- %s" ${PREVIOUS_TAG}..HEAD)
+        else
+          CHANGES=$(git log --pretty=format:"- %s" --max-count=10)
+        fi
+        
+        cat > release_notes.md << EOF
+        ## 🚀 What's New in v${{ steps.bump-version.outputs.version }}
+        
+        ### Changes
+        $CHANGES
+        
+        ### 📦 Docker Images
+        - \`suysoftware/modulex:latest\`
+        - \`suysoftware/modulex:v${{ steps.bump-version.outputs.version }}\`
+        
+        ### 🔧 Installation
+        \`\`\`bash
+        docker pull suysoftware/modulex:v${{ steps.bump-version.outputs.version }}
+        docker run -p 8000:8000 suysoftware/modulex:v${{ steps.bump-version.outputs.version }}
+        \`\`\`
+        
+        ### 📖 Documentation
+        - [GitHub Repository](https://github.com/suysoftware/modulex)
+        - [API Documentation](http://localhost:8000/docs)
+        EOF
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.bump-version.outputs.version }}
+        release_name: Release v${{ steps.bump-version.outputs.version }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: false 
