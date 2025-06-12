@@ -8,6 +8,7 @@ ModuleX is a powerful, production-ready platform for managing Model Context Prot
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com/)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-suysoftware%2Fmodulex-blue.svg)](https://hub.docker.com/r/suysoftware/modulex)
 
 ## ✨ Features
 
@@ -38,13 +39,72 @@ ModuleX is a powerful, production-ready platform for managing Model Context Prot
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.9+
-- Docker & Docker Compose
-- PostgreSQL (if running without Docker)
-- Redis (if running without Docker)
+### 🐳 Docker Hub (One-Click Deployment)
 
-### 🐳 Docker Deployment (Recommended)
+**The fastest way to get ModuleX running!**
+
+1. **Pull and run the latest image**
+```bash
+docker run -d \
+  --name modulex \
+  -p 8000:8000 \
+  -e DATABASE_URL="sqlite:///app/data/modulex.db" \
+  -e REDIS_URL="redis://redis:6379" \
+  -v modulex_data:/app/data \
+  suysoftware/modulex:latest
+```
+
+2. **Or with docker-compose (recommended)**
+```yaml
+version: '3.8'
+services:
+  modulex:
+    image: suysoftware/modulex:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/modulex
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+  
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: modulex
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+3. **Access your ModuleX instance**
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health/
+
+### 🏷️ Available Docker Tags
+
+- `suysoftware/modulex:latest` - Latest stable release
+- `suysoftware/modulex:dev` - Development version
+- `suysoftware/modulex:v0.1.0` - Specific version tags
+
+### Prerequisites
+- Docker
+- PostgreSQL (optional, can use SQLite)
+- Redis (optional, for caching)
+
+### 🐳 Docker Deployment (Full Stack)
 
 1. **Clone the repository**
 ```bash

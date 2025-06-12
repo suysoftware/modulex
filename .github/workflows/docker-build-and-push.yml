@@ -1,0 +1,125 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKER_IMAGE }}  # Artık secret olarak saklanacak
+  REGISTRY: docker.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Tam git history için
+    
+    # Semantic versioning için
+    - name: Get version
+      id: version
+      run: |
+        # pyproject.toml'dan version'ı al
+        VERSION=$(python -c "import toml; print(toml.load('py/pyproject.toml')['project']['version'])")
+        
+        # Git tag varsa onu kullan, yoksa pyproject.toml'dan al
+        GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+        
+        if [ -n "$GIT_TAG" ]; then
+          echo "version=$GIT_TAG" >> $GITHUB_OUTPUT
+        else
+          # Commit SHA ile birleştir
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "latest=latest" >> $GITHUB_OUTPUT
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DOCKER_IMAGE }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=${{ steps.version.outputs.version }}
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./py
+        file: ./py/Dockerfile
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Docker Scout (security scan)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: docker/scout-action@v1
+      with:
+        command: cves
+        image: ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.version }}
+        only-severities: critical,high
+        write-comment: true
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Dev branch için ayrı job
+  build-dev:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get dev version
+      id: dev-version
+      run: |
+        VERSION=$(python -c "import toml; print(toml.load('py/pyproject.toml')['project']['version'])")
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        echo "version=${VERSION}-dev-${SHORT_SHA}" >> $GITHUB_OUTPUT
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push dev image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./py
+        file: ./py/Dockerfile
+        push: true
+        tags: |
+          ${{ env.DOCKER_IMAGE }}:dev
+          ${{ env.DOCKER_IMAGE }}:${{ steps.dev-version.outputs.version }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max 
