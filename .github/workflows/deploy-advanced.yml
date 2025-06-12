@@ -70,7 +70,7 @@ jobs:
           echo "💾 Creating backup..."
           BACKUP_DIR="~/backups/modulex-$(date +%Y%m%d_%H%M%S)"
           mkdir -p ~/backups
-          cp -r . "$BACKUP_DIR" || echo "⚠️ Backup failed, continuing...."
+          cp -r . "$BACKUP_DIR" || echo "⚠️ Backup failed, continuing....."
           
           # Git operations
           echo "📥 Fetching latest changes"
