@@ -48,7 +48,6 @@ jobs:
         if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
           echo "type=${{ github.event.inputs.version_type }}" >> $GITHUB_OUTPUT
         else
-          # Commit mesajlarına göre version type belirle
           COMMITS=$(git log --oneline $(git describe --tags --abbrev=0)..HEAD 2>/dev/null || git log --oneline)
           
           if echo "$COMMITS" | grep -i -E "(breaking|major)"; then
@@ -66,57 +65,38 @@ jobs:
         CURRENT_VERSION=$(python -c "import toml; print(toml.load('py/pyproject.toml')['project']['version'])")
         echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
     
-    - name: Create version bump script
+    - name: Bump version
+      id: bump-version
       run: |
-        cat > bump_version.py << 'EOF'
-import toml
-import os
-import sys
-
-# Version type'ı command line'dan al
-version_type = sys.argv[1] if len(sys.argv) > 1 else 'patch'
-
-# Config dosyasını oku
+        python -c "
+import toml, sys, os
+version_type = '${{ steps.version-type.outputs.type }}'
 config = toml.load('py/pyproject.toml')
 current_version = config['project']['version']
 major, minor, patch = map(int, current_version.split('.'))
-
-# Yeni version hesapla
 if version_type == 'major':
     new_version = f'{major + 1}.0.0'
 elif version_type == 'minor':
     new_version = f'{major}.{minor + 1}.0'
-else:  # patch
+else:
     new_version = f'{major}.{minor}.{patch + 1}'
-
-# Config dosyasını güncelle
 config['project']['version'] = new_version
-
-# Dosyayı kaydet
 with open('py/pyproject.toml', 'w') as f:
     toml.dump(config, f)
-
-print(f'Version updated from {current_version} to {new_version}')
-print(f'NEW_VERSION={new_version}')
-EOF
-    
-    - name: Bump version
-      id: bump-version
-      run: |
-        VERSION_OUTPUT=$(python bump_version.py "${{ steps.version-type.outputs.type }}")
-        NEW_VERSION=$(echo "$VERSION_OUTPUT" | grep "NEW_VERSION=" | cut -d'=' -f2)
+print(f'version={new_version}')
+        " > version_output.txt
+        NEW_VERSION=$(cat version_output.txt | grep "version=" | cut -d'=' -f2)
         echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "Version bumped to: $NEW_VERSION"
+        rm version_output.txt
     
     - name: Create changelog entry
       run: |
         NEW_VERSION="${{ steps.bump-version.outputs.version }}"
         DATE=$(date +%Y-%m-%d)
         
-        # Git log'u al
         CHANGES=$(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD 2>/dev/null | sed 's/^/- /' || echo "- Initial release")
         
-        # Changelog'u güncelle
         echo "# Changelog" > new_changelog.md
         echo "" >> new_changelog.md
         echo "## [$NEW_VERSION] - $DATE" >> new_changelog.md
@@ -125,7 +105,6 @@ EOF
         echo "$CHANGES" >> new_changelog.md
         echo "" >> new_changelog.md
         
-        # Mevcut changelog'u ekle (varsa)
         if [ -f CHANGELOG.md ]; then
           tail -n +2 CHANGELOG.md >> new_changelog.md
         fi
@@ -154,31 +133,25 @@ EOF
           CHANGES=$(git log --pretty=format:"- %s" --max-count=10)
         fi
         
-        cat > release_notes.md << 'RELEASE_EOF'
-## 🚀 What's New in v$NEW_VERSION
-
-### Changes
-$CHANGES
-
-### 📦 Docker Images
-- ${{ secrets.DOCKER_IMAGE }}:latest
-- ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION
-
-### 🔧 Installation
-```bash
-docker pull ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION
-docker run -p 8000:8000 ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION
-```
-
-### 📖 Documentation
-- [GitHub Repository](https://github.com/suysoftware/modulex)
-- [API Documentation](http://localhost:8000/docs)
-RELEASE_EOF
-        
-        # Variable substitution
-        sed -i.bak "s/\$NEW_VERSION/$NEW_VERSION/g" release_notes.md
-        sed -i.bak "s/\$CHANGES/$CHANGES/g" release_notes.md
-        rm -f release_notes.md.bak
+        # Create release notes without problematic syntax
+        echo "## 🚀 What's New in v$NEW_VERSION" > release_notes.md
+        echo "" >> release_notes.md
+        echo "### Changes" >> release_notes.md
+        echo "$CHANGES" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 📦 Docker Images" >> release_notes.md
+        echo "- your-username/modulex:latest" >> release_notes.md
+        echo "- your-username/modulex:v$NEW_VERSION" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 🔧 Installation" >> release_notes.md
+        echo '```bash' >> release_notes.md
+        echo "docker pull your-username/modulex:v$NEW_VERSION" >> release_notes.md
+        echo "docker run -p 8000:8000 your-username/modulex:v$NEW_VERSION" >> release_notes.md
+        echo '```' >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 📖 Documentation" >> release_notes.md
+        echo "- [GitHub Repository](https://github.com/suysoftware/modulex)" >> release_notes.md
+        echo "- [API Documentation](http://localhost:8000/docs)" >> release_notes.md
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -189,8 +162,4 @@ RELEASE_EOF
         name: Release v${{ steps.bump-version.outputs.version }}
         body_path: release_notes.md
         draft: false
-        prerelease: false
-    
-    - name: Cleanup
-      run: |
-        rm -f bump_version.py 
+        prerelease: false 
