@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2] - 2025-06-12
+
+### Changes
+- 8032e2f Merge pull request #5 from suysoftware/dev
+- 30fdfba Merge branch 'main' of https://github.com/suysoftware/modulex into dev
+- df30d04 Add toml module installation in Docker build workflow
+
+
 ## [0.1.1] - 2025-06-12
 
 ### Changes
