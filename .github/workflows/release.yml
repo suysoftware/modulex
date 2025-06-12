@@ -69,36 +69,36 @@ jobs:
     - name: Create version bump script
       run: |
         cat > bump_version.py << 'EOF'
-        import toml
-        import os
-        import sys
-        
-        # Version type'ı command line'dan al
-        version_type = sys.argv[1] if len(sys.argv) > 1 else 'patch'
-        
-        # Config dosyasını oku
-        config = toml.load('py/pyproject.toml')
-        current_version = config['project']['version']
-        major, minor, patch = map(int, current_version.split('.'))
-        
-        # Yeni version hesapla
-        if version_type == 'major':
-            new_version = f'{major + 1}.0.0'
-        elif version_type == 'minor':
-            new_version = f'{major}.{minor + 1}.0'
-        else:  # patch
-            new_version = f'{major}.{minor}.{patch + 1}'
-        
-        # Config dosyasını güncelle
-        config['project']['version'] = new_version
-        
-        # Dosyayı kaydet
-        with open('py/pyproject.toml', 'w') as f:
-            toml.dump(config, f)
-        
-        print(f'Version updated from {current_version} to {new_version}')
-        print(f'NEW_VERSION={new_version}')
-        EOF
+import toml
+import os
+import sys
+
+# Version type'ı command line'dan al
+version_type = sys.argv[1] if len(sys.argv) > 1 else 'patch'
+
+# Config dosyasını oku
+config = toml.load('py/pyproject.toml')
+current_version = config['project']['version']
+major, minor, patch = map(int, current_version.split('.'))
+
+# Yeni version hesapla
+if version_type == 'major':
+    new_version = f'{major + 1}.0.0'
+elif version_type == 'minor':
+    new_version = f'{major}.{minor + 1}.0'
+else:  # patch
+    new_version = f'{major}.{minor}.{patch + 1}'
+
+# Config dosyasını güncelle
+config['project']['version'] = new_version
+
+# Dosyayı kaydet
+with open('py/pyproject.toml', 'w') as f:
+    toml.dump(config, f)
+
+print(f'Version updated from {current_version} to {new_version}')
+print(f'NEW_VERSION={new_version}')
+EOF
     
     - name: Bump version
       id: bump-version
@@ -154,26 +154,31 @@ jobs:
           CHANGES=$(git log --pretty=format:"- %s" --max-count=10)
         fi
         
-        cat > release_notes.md << EOF
-## 🚀 What's New in v${NEW_VERSION}
+        cat > release_notes.md << 'RELEASE_EOF'
+## 🚀 What's New in v$NEW_VERSION
 
 ### Changes
-${CHANGES}
+$CHANGES
 
 ### 📦 Docker Images
-- \`your-username/modulex:latest\`
-- \`your-username/modulex:v${NEW_VERSION}\`
+- ${{ secrets.DOCKER_IMAGE }}:latest
+- ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION
 
 ### 🔧 Installation
-\`\`\`bash
-docker pull your-username/modulex:v${NEW_VERSION}
-docker run -p 8000:8000 your-username/modulex:v${NEW_VERSION}
-\`\`\`
+```bash
+docker pull ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION
+docker run -p 8000:8000 ${{ secrets.DOCKER_IMAGE }}:v$NEW_VERSION
+```
 
 ### 📖 Documentation
 - [GitHub Repository](https://github.com/suysoftware/modulex)
 - [API Documentation](http://localhost:8000/docs)
-EOF
+RELEASE_EOF
+        
+        # Variable substitution
+        sed -i.bak "s/\$NEW_VERSION/$NEW_VERSION/g" release_notes.md
+        sed -i.bak "s/\$CHANGES/$CHANGES/g" release_notes.md
+        rm -f release_notes.md.bak
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
