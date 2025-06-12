@@ -23,11 +23,13 @@ jobs:
         python-version: '3.11'
     
     - name: Install dependencies
+      working-directory: ./py
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
     
     - name: Run tests
+      working-directory: ./py
       run: |
         python -m pytest tests/ || echo "No tests found, skipping..."
 
