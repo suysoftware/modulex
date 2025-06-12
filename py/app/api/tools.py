@@ -100,6 +100,11 @@ async def get_user_openai_tools(
         # Get user's authenticated tools
         user_tools = await auth_service.get_user_tools(user_id)
         
+        if not user_tools:
+            # Log for debugging but return empty list (not an error)
+            import logging
+            logging.info(f"No authenticated tools found for user_id={user_id}")
+        
         openai_tools = []
         
         for user_tool in user_tools:
@@ -143,6 +148,8 @@ async def get_user_openai_tools(
         return openai_tools
         
     except Exception as e:
+        import logging
+        logging.error(f"Error retrieving OpenAI tools for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving OpenAI tools: {str(e)}")
 
 
@@ -197,4 +204,81 @@ async def execute_tool_direct(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tool execution error: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Tool execution error: {str(e)}")
+
+
+# Debug endpoint to help troubleshoot the issue
+@router.get("/debug/users/{user_id}/tools")
+async def debug_user_tools(
+    user_id: str = Path(..., description="User ID"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Debug endpoint to check user's authentication status"""
+    auth_service = AuthService(db)
+    tool_service = ToolService(db)
+    
+    debug_info = {
+        "user_id": user_id,
+        "debug_steps": []
+    }
+    
+    try:
+        # Step 1: Check if user exists in database
+        user = await auth_service.get_or_create_user(user_id)
+        debug_info["debug_steps"].append({
+            "step": "get_user",
+            "success": True,
+            "data": {
+                "user_internal_id": str(user.id),
+                "external_id": user.external_id
+            }
+        })
+        
+        # Step 2: Get user's authenticated tools
+        user_tools = await auth_service.get_user_tools(user_id)
+        debug_info["debug_steps"].append({
+            "step": "get_user_tools",
+            "success": True,
+            "data": {
+                "tools_count": len(user_tools),
+                "tools": user_tools
+            }
+        })
+        
+        # Step 3: Check available integrations
+        available_tools = await tool_service.list_available_tools()
+        debug_info["debug_steps"].append({
+            "step": "list_available_tools",
+            "success": True,
+            "data": {
+                "available_count": len(available_tools),
+                "available_tools": [t.get("name") for t in available_tools]
+            }
+        })
+        
+        # Step 4: Try to get tool info for each authenticated tool
+        tool_info_results = []
+        for user_tool in user_tools:
+            tool_name = user_tool["tool_name"]
+            tool_info = await tool_service.get_tool_info(tool_name)
+            tool_info_results.append({
+                "tool_name": tool_name,
+                "info_available": bool(tool_info),
+                "actions_count": len(tool_info.get("actions", [])) if tool_info else 0
+            })
+        
+        debug_info["debug_steps"].append({
+            "step": "check_tool_info",
+            "success": True,
+            "data": tool_info_results
+        })
+        
+        return debug_info
+        
+    except Exception as e:
+        debug_info["debug_steps"].append({
+            "step": "error",
+            "success": False,
+            "error": str(e)
+        })
+        return debug_info 

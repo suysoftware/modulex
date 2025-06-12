@@ -183,13 +183,17 @@ class ToolService:
     async def get_tool_info(self, tool_name: str) -> Optional[Dict[str, Any]]:
         """Get tool information"""
         info_file = self.integrations_path / tool_name / "info.json"
+        
         if not info_file.exists():
             return None
         
         try:
             with open(info_file, 'r') as f:
-                return json.load(f)
-        except Exception:
+                tool_info = json.load(f)
+                return tool_info
+        except Exception as e:
+            import logging
+            logging.error(f"Error loading tool info for {tool_name}: {e}")
             return None
     
     async def list_available_tools(self) -> list:
