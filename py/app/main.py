@@ -65,13 +65,13 @@ async def root():
             },
             "openai_integration": {
                 "get_user_openai_tools": "/tools/openai/users/{user_id}/openai-tools",
-                "execute_tool_direct": "/tools/{tool_name_action}/execute?user_id=YOUR_USER_ID"
+                "execute_tool_direct": "/tools/direct/{tool_name_action}/execute?user_id=YOUR_USER_ID"
             }
         },
         "vercel_ai_sdk_usage": {
             "description": "For Vercel AI SDK integration",
             "get_tools": "GET /tools/openai/users/{USER_ID}/openai-tools",
-            "execute_tool": "POST /tools/{toolName_action}/execute?user_id={USER_ID}",
+            "execute_tool": "POST /tools/direct/{toolName_action}/execute?user_id={USER_ID}",
             "note": "Tool names in execution should be in format: toolname_action (e.g., github_list_repositories)"
         }
     }
