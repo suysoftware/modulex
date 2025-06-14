@@ -42,7 +42,6 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(tools.router)
-app.include_router(tools.router_direct)  # Add the direct execution router
 
 
 @app.get("/")
