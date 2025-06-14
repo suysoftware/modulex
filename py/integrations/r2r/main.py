@@ -245,8 +245,37 @@ def list_documents(parameters: Dict[str, Any], user_credentials: Optional[Dict[s
                 # Handle different document formats
                 doc_info = {}
                 
+                # Handle DocumentResponse objects (R2R specific)
+                if hasattr(doc, 'id') and hasattr(doc, '__class__') and 'DocumentResponse' in str(type(doc)):
+                    # Convert UUID to string for JSON serialization
+                    doc_info["id"] = str(doc.id)
+                    doc_info["short_id"] = id_to_shorthand(str(doc.id))
+                    
+                    # Get other attributes with proper type conversion
+                    if hasattr(doc, 'title') and doc.title:
+                        doc_info["title"] = str(doc.title)
+                    elif hasattr(doc, 'metadata') and doc.metadata and isinstance(doc.metadata, dict):
+                        # Try to get title from metadata
+                        doc_info["title"] = str(doc.metadata.get('title', f"Document {i+1}"))
+                    else:
+                        doc_info["title"] = f"Document {i+1}"
+                    
+                    if hasattr(doc, 'created_at') and doc.created_at:
+                        doc_info["created_at"] = str(doc.created_at)
+                    
+                    if hasattr(doc, 'updated_at') and doc.updated_at:
+                        doc_info["updated_at"] = str(doc.updated_at)
+                    
+                    if hasattr(doc, 'metadata') and doc.metadata:
+                        # Convert metadata to JSON-serializable format
+                        try:
+                            import json
+                            doc_info["metadata"] = json.loads(json.dumps(doc.metadata, default=str))
+                        except:
+                            doc_info["metadata"] = str(doc.metadata)
+                
                 # Handle tuple format specifically
-                if isinstance(doc, tuple):
+                elif isinstance(doc, tuple):
                     print(f"🔍 DEBUG: Tuple doc has {len(doc)} elements: {doc}")
                     if len(doc) >= 1:
                         doc_info["id"] = str(doc[0])
@@ -258,26 +287,26 @@ def list_documents(parameters: Dict[str, Any], user_credentials: Optional[Dict[s
                     if len(doc) >= 4:
                         doc_info["size"] = doc[3] if isinstance(doc[3], (int, float)) else None
                     # Add all tuple elements for debugging
-                    doc_info["tuple_elements"] = list(doc)
+                    doc_info["tuple_elements"] = [str(x) for x in doc]
                     
                 # Handle object with attributes
                 elif hasattr(doc, 'id'):
-                    doc_info["id"] = doc.id
-                    doc_info["short_id"] = id_to_shorthand(doc.id)
+                    doc_info["id"] = str(doc.id)
+                    doc_info["short_id"] = id_to_shorthand(str(doc.id))
                     if hasattr(doc, 'title'):
-                        doc_info["title"] = doc.title
+                        doc_info["title"] = str(doc.title)
                     if hasattr(doc, 'created_at'):
-                        doc_info["created_at"] = doc.created_at
+                        doc_info["created_at"] = str(doc.created_at)
                         
                 # Handle dictionary format
                 elif isinstance(doc, dict):
                     if 'id' in doc:
-                        doc_info["id"] = doc['id']
-                        doc_info["short_id"] = id_to_shorthand(doc['id'])
+                        doc_info["id"] = str(doc['id'])
+                        doc_info["short_id"] = id_to_shorthand(str(doc['id']))
                     if 'title' in doc:
-                        doc_info["title"] = doc['title']
+                        doc_info["title"] = str(doc['title'])
                     if 'created_at' in doc:
-                        doc_info["created_at"] = doc['created_at']
+                        doc_info["created_at"] = str(doc['created_at'])
                     doc_info["raw_keys"] = list(doc.keys())
                     
                 else:
@@ -354,8 +383,40 @@ def get_document(parameters: Dict[str, Any], user_credentials: Optional[Dict[str
         # Handle different document formats
         doc_info = {}
         
+        # Handle DocumentResponse objects (R2R specific)
+        if hasattr(doc, 'id') and hasattr(doc, '__class__') and 'DocumentResponse' in str(type(doc)):
+            # Convert UUID to string for JSON serialization
+            doc_info["id"] = str(doc.id)
+            doc_info["short_id"] = id_to_shorthand(str(doc.id))
+            
+            # Get other attributes with proper type conversion
+            if hasattr(doc, 'title') and doc.title:
+                doc_info["title"] = str(doc.title)
+            elif hasattr(doc, 'metadata') and doc.metadata and isinstance(doc.metadata, dict):
+                # Try to get title from metadata
+                doc_info["title"] = str(doc.metadata.get('title', "Untitled Document"))
+            else:
+                doc_info["title"] = "Untitled Document"
+            
+            if hasattr(doc, 'created_at') and doc.created_at:
+                doc_info["created_at"] = str(doc.created_at)
+            
+            if hasattr(doc, 'updated_at') and doc.updated_at:
+                doc_info["updated_at"] = str(doc.updated_at)
+            
+            if hasattr(doc, 'size') and doc.size:
+                doc_info["size"] = int(doc.size) if isinstance(doc.size, (int, float)) else str(doc.size)
+            
+            if hasattr(doc, 'metadata') and doc.metadata:
+                # Convert metadata to JSON-serializable format
+                try:
+                    import json
+                    doc_info["metadata"] = json.loads(json.dumps(doc.metadata, default=str))
+                except:
+                    doc_info["metadata"] = str(doc.metadata)
+        
         # Handle tuple format specifically
-        if isinstance(doc, tuple):
+        elif isinstance(doc, tuple):
             print(f"🔍 DEBUG: Tuple doc has {len(doc)} elements: {doc}")
             if len(doc) >= 1:
                 doc_info["id"] = str(doc[0])
@@ -367,46 +428,46 @@ def get_document(parameters: Dict[str, Any], user_credentials: Optional[Dict[str
             if len(doc) >= 4:
                 doc_info["size"] = doc[3] if isinstance(doc[3], (int, float)) else None
             # Add all tuple elements for debugging
-            doc_info["tuple_elements"] = list(doc)
+            doc_info["tuple_elements"] = [str(x) for x in doc]
             
         # Handle object with attributes
         elif hasattr(doc, 'id'):
-            doc_info["id"] = doc.id
-            doc_info["short_id"] = id_to_shorthand(doc.id)
+            doc_info["id"] = str(doc.id)
+            doc_info["short_id"] = id_to_shorthand(str(doc.id))
             if hasattr(doc, 'title'):
-                doc_info["title"] = doc.title
+                doc_info["title"] = str(doc.title)
             if hasattr(doc, 'created_at'):
-                doc_info["created_at"] = doc.created_at
+                doc_info["created_at"] = str(doc.created_at)
             if hasattr(doc, 'size'):
-                doc_info["size"] = doc.size
+                doc_info["size"] = str(doc.size)
             if hasattr(doc, 'metadata'):
-                doc_info["metadata"] = doc.metadata
+                doc_info["metadata"] = str(doc.metadata)
                 
         # Handle dictionary format
         elif isinstance(doc, dict):
             if 'id' in doc:
-                doc_info["id"] = doc['id']
-                doc_info["short_id"] = id_to_shorthand(doc['id'])
+                doc_info["id"] = str(doc['id'])
+                doc_info["short_id"] = id_to_shorthand(str(doc['id']))
             if 'title' in doc:
-                doc_info["title"] = doc['title']
+                doc_info["title"] = str(doc['title'])
             if 'created_at' in doc:
-                doc_info["created_at"] = doc['created_at']
+                doc_info["created_at"] = str(doc['created_at'])
             if 'size' in doc:
-                doc_info["size"] = doc['size']
+                doc_info["size"] = str(doc['size'])
             if 'metadata' in doc:
                 doc_info["metadata"] = doc['metadata']
             doc_info["raw_keys"] = list(doc.keys())
             
         else:
             # Fallback: use provided ID
-            doc_info["id"] = document_id
-            doc_info["short_id"] = id_to_shorthand(document_id)
+            doc_info["id"] = str(document_id)
+            doc_info["short_id"] = id_to_shorthand(str(document_id))
             doc_info["title"] = "Unknown Document"
         
         # Ensure we have minimum required fields
         if "id" not in doc_info:
-            doc_info["id"] = document_id
-            doc_info["short_id"] = id_to_shorthand(document_id)
+            doc_info["id"] = str(document_id)
+            doc_info["short_id"] = id_to_shorthand(str(document_id))
         if "title" not in doc_info:
             doc_info["title"] = "Untitled Document"
         
@@ -476,8 +537,29 @@ def list_collections(parameters: Dict[str, Any], user_credentials: Optional[Dict
                 # Handle different collection formats
                 col_info = {}
                 
+                # Handle CollectionResponse objects (R2R specific)
+                if hasattr(col, 'id') and hasattr(col, '__class__') and ('Response' in str(type(col)) or 'Collection' in str(type(col))):
+                    # Convert UUID to string for JSON serialization
+                    col_info["id"] = str(col.id)
+                    col_info["short_id"] = id_to_shorthand(str(col.id))
+                    
+                    # Get other attributes with proper type conversion
+                    if hasattr(col, 'name') and col.name:
+                        col_info["name"] = str(col.name)
+                    else:
+                        col_info["name"] = f"Collection {i+1}"
+                    
+                    if hasattr(col, 'description') and col.description:
+                        col_info["description"] = str(col.description)
+                    
+                    if hasattr(col, 'created_at') and col.created_at:
+                        col_info["created_at"] = str(col.created_at)
+                    
+                    if hasattr(col, 'updated_at') and col.updated_at:
+                        col_info["updated_at"] = str(col.updated_at)
+                
                 # Handle tuple format specifically
-                if isinstance(col, tuple):
+                elif isinstance(col, tuple):
                     print(f"🔍 DEBUG: Tuple collection has {len(col)} elements: {col}")
                     if len(col) >= 1:
                         col_info["id"] = str(col[0])
@@ -487,26 +569,26 @@ def list_collections(parameters: Dict[str, Any], user_credentials: Optional[Dict
                     if len(col) >= 3:
                         col_info["description"] = str(col[2]) if col[2] else None
                     # Add all tuple elements for debugging
-                    col_info["tuple_elements"] = list(col)
+                    col_info["tuple_elements"] = [str(x) for x in col]
                     
                 # Handle object with attributes
                 elif hasattr(col, 'id'):
-                    col_info["id"] = col.id
-                    col_info["short_id"] = id_to_shorthand(col.id)
+                    col_info["id"] = str(col.id)
+                    col_info["short_id"] = id_to_shorthand(str(col.id))
                     if hasattr(col, 'name'):
-                        col_info["name"] = col.name
+                        col_info["name"] = str(col.name)
                     if hasattr(col, 'description'):
-                        col_info["description"] = col.description
+                        col_info["description"] = str(col.description)
                         
                 # Handle dictionary format
                 elif isinstance(col, dict):
                     if 'id' in col:
-                        col_info["id"] = col['id']
-                        col_info["short_id"] = id_to_shorthand(col['id'])
+                        col_info["id"] = str(col['id'])
+                        col_info["short_id"] = id_to_shorthand(str(col['id']))
                     if 'name' in col:
-                        col_info["name"] = col['name']
+                        col_info["name"] = str(col['name'])
                     if 'description' in col:
-                        col_info["description"] = col['description']
+                        col_info["description"] = str(col['description'])
                     col_info["raw_keys"] = list(col.keys())
                     
                 else:
