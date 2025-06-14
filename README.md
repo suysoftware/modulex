@@ -180,9 +180,9 @@ curl "http://localhost:8000/tools/github"
 
 3. **Execute Tool Action**
 ```bash
-curl -X POST "http://localhost:8000/tools/github_list_repositories/execute?user_id=your_user_id" \
+curl -X POST "http://localhost:8000/tools/github/execute?user_id=your_user_id" \
   -H "Content-Type: application/json" \
-  -d '{"per_page": 10}'
+  -d '{"per_page": 10, "action": "list_repositories"}'
 ```
 
 ### OpenAI/Vercel AI SDK Integration
@@ -194,9 +194,9 @@ curl "http://localhost:8000/tools/openai/users/your_user_id/openai-tools"
 
 2. **Execute Tool (OpenAI Format)**
 ```bash
-curl -X POST "http://localhost:8000/tools/github_list_repositories/execute?user_id=your_user_id" \
+curl -X POST "http://localhost:8000/tools/github/execute?user_id=your_user_id" \
   -H "Content-Type: application/json" \
-  -d '{"per_page": 30}'
+  -d '{"per_page": 10, "action": "list_repositories"}'
 ```
 
 ## 🔧 Configuration
