@@ -195,38 +195,106 @@ def list_documents(parameters: Dict[str, Any], user_credentials: Optional[Dict[s
     limit = parameters.get("limit", 10)
     offset = parameters.get("offset", 0)
     
-    response = client.documents.list(
-        limit=limit,
-        offset=offset
-    )
-    
-    docs = response.documents if hasattr(response, "documents") else response
-    
-    if not docs:
+    try:
+        response = client.documents.list(
+            limit=limit,
+            offset=offset
+        )
+        
+        # Debug: Log response structure
+        print(f"🔍 DEBUG: R2R response type: {type(response)}")
+        print(f"🔍 DEBUG: R2R response attributes: {dir(response)}")
+        
+        docs = response.documents if hasattr(response, "documents") else response
+        print(f"🔍 DEBUG: docs type: {type(docs)}")
+        
+        if not docs:
+            return {
+                "documents": [],
+                "message": "Hiç döküman bulunamadı.",
+                "total": 0
+            }
+        
+        # Handle different response formats
+        if isinstance(docs, (list, tuple)):
+            print(f"🔍 DEBUG: docs is list/tuple with {len(docs)} items")
+            if len(docs) > 0:
+                print(f"🔍 DEBUG: First doc type: {type(docs[0])}")
+                print(f"🔍 DEBUG: First doc attributes: {dir(docs[0]) if hasattr(docs[0], '__dict__') else 'No attributes'}")
+        
+        doc_list = []
+        for i, doc in enumerate(docs):
+            try:
+                print(f"🔍 DEBUG: Processing doc {i}: type={type(doc)}")
+                
+                # Handle different document formats
+                doc_info = {}
+                
+                # Try different ways to get document ID
+                if hasattr(doc, 'id'):
+                    doc_info["id"] = doc.id
+                    doc_info["short_id"] = id_to_shorthand(doc.id)
+                elif isinstance(doc, dict) and 'id' in doc:
+                    doc_info["id"] = doc['id']
+                    doc_info["short_id"] = id_to_shorthand(doc['id'])
+                elif isinstance(doc, (list, tuple)) and len(doc) > 0:
+                    # If it's a tuple/list, try to use first element as ID
+                    doc_info["id"] = str(doc[0])
+                    doc_info["short_id"] = id_to_shorthand(str(doc[0]))
+                else:
+                    # Fallback: use index as ID
+                    doc_info["id"] = f"doc_{i}"
+                    doc_info["short_id"] = f"doc_{i}"
+                
+                # Try to get other attributes
+                if hasattr(doc, 'title'):
+                    doc_info["title"] = doc.title
+                elif isinstance(doc, dict) and 'title' in doc:
+                    doc_info["title"] = doc['title']
+                
+                if hasattr(doc, 'created_at'):
+                    doc_info["created_at"] = doc.created_at
+                elif isinstance(doc, dict) and 'created_at' in doc:
+                    doc_info["created_at"] = doc['created_at']
+                
+                # Add raw doc info for debugging
+                if isinstance(doc, dict):
+                    doc_info["raw_keys"] = list(doc.keys())
+                elif hasattr(doc, '__dict__'):
+                    doc_info["raw_attrs"] = [attr for attr in dir(doc) if not attr.startswith('_')]
+                
+                doc_list.append(doc_info)
+                print(f"✅ DEBUG: Successfully processed doc {i}")
+                
+            except Exception as doc_error:
+                print(f"💥 DEBUG: Error processing doc {i}: {str(doc_error)}")
+                # Add error info but continue processing
+                doc_list.append({
+                    "id": f"error_doc_{i}",
+                    "short_id": f"err_{i}",
+                    "error": str(doc_error),
+                    "doc_type": str(type(doc))
+                })
+        
         return {
+            "documents": doc_list,
+            "total": len(docs),
+            "limit": limit,
+            "offset": offset,
+            "debug_info": {
+                "response_type": str(type(response)),
+                "docs_type": str(type(docs)),
+                "docs_length": len(docs) if docs else 0
+            }
+        }
+        
+    except Exception as e:
+        print(f"💥 DEBUG: list_documents error: {str(e)}")
+        return {
+            "error": f"Error listing documents: {str(e)}",
             "documents": [],
-            "message": "Hiç döküman bulunamadı.",
             "total": 0
         }
-    
-    doc_list = []
-    for doc in docs:
-        doc_info = {
-            "id": doc.id,
-            "short_id": id_to_shorthand(doc.id)
-        }
-        if hasattr(doc, 'title'):
-            doc_info["title"] = doc.title
-        if hasattr(doc, 'created_at'):
-            doc_info["created_at"] = doc.created_at
-        doc_list.append(doc_info)
-    
-    return {
-        "documents": doc_list,
-        "total": len(docs),
-        "limit": limit,
-        "offset": offset
-    }
 
 
 def get_document(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -237,25 +305,66 @@ def get_document(parameters: Dict[str, Any], user_credentials: Optional[Dict[str
     
     try:
         response = client.documents.retrieve(id=document_id)
+        
+        # Debug: Log response structure
+        print(f"🔍 DEBUG: get_document response type: {type(response)}")
+        print(f"🔍 DEBUG: get_document response attributes: {dir(response)}")
+        
         doc = response.document if hasattr(response, "document") else response
+        print(f"🔍 DEBUG: doc type: {type(doc)}")
         
-        doc_info = {
-            "id": doc.id,
-            "short_id": id_to_shorthand(doc.id)
-        }
+        # Handle different document formats
+        doc_info = {}
         
+        # Try different ways to get document ID
+        if hasattr(doc, 'id'):
+            doc_info["id"] = doc.id
+            doc_info["short_id"] = id_to_shorthand(doc.id)
+        elif isinstance(doc, dict) and 'id' in doc:
+            doc_info["id"] = doc['id']
+            doc_info["short_id"] = id_to_shorthand(doc['id'])
+        else:
+            # Fallback: use provided ID
+            doc_info["id"] = document_id
+            doc_info["short_id"] = id_to_shorthand(document_id)
+        
+        # Try to get other attributes
         if hasattr(doc, 'title'):
             doc_info["title"] = doc.title
+        elif isinstance(doc, dict) and 'title' in doc:
+            doc_info["title"] = doc['title']
+            
         if hasattr(doc, 'created_at'):
             doc_info["created_at"] = doc.created_at
+        elif isinstance(doc, dict) and 'created_at' in doc:
+            doc_info["created_at"] = doc['created_at']
+            
         if hasattr(doc, 'size'):
             doc_info["size"] = doc.size
+        elif isinstance(doc, dict) and 'size' in doc:
+            doc_info["size"] = doc['size']
+            
         if hasattr(doc, 'metadata'):
             doc_info["metadata"] = doc.metadata
+        elif isinstance(doc, dict) and 'metadata' in doc:
+            doc_info["metadata"] = doc['metadata']
         
-        return {"document": doc_info}
+        # Add raw doc info for debugging
+        if isinstance(doc, dict):
+            doc_info["raw_keys"] = list(doc.keys())
+        elif hasattr(doc, '__dict__'):
+            doc_info["raw_attrs"] = [attr for attr in dir(doc) if not attr.startswith('_')]
+        
+        return {
+            "document": doc_info,
+            "debug_info": {
+                "response_type": str(type(response)),
+                "doc_type": str(type(doc))
+            }
+        }
         
     except Exception as e:
+        print(f"💥 DEBUG: get_document error: {str(e)}")
         return {
             "error": f"Error retrieving document: {str(e)}",
             "document_id": document_id
@@ -268,29 +377,90 @@ def list_collections(parameters: Dict[str, Any], user_credentials: Optional[Dict
     
     try:
         response = client.collections.list()
+        
+        # Debug: Log response structure
+        print(f"🔍 DEBUG: list_collections response type: {type(response)}")
+        print(f"🔍 DEBUG: list_collections response attributes: {dir(response)}")
+        
         collections = response.collections if hasattr(response, "collections") else response
+        print(f"🔍 DEBUG: collections type: {type(collections)}")
+        
+        if not collections:
+            return {
+                "collections": [],
+                "message": "Collections endpoint not available or no collections found",
+                "total": 0
+            }
         
         collection_list = []
-        for col in collections:
-            col_info = {
-                "id": col.id,
-                "short_id": id_to_shorthand(col.id)
-            }
-            if hasattr(col, 'name'):
-                col_info["name"] = col.name
-            if hasattr(col, 'description'):
-                col_info["description"] = col.description
-            collection_list.append(col_info)
+        for i, col in enumerate(collections):
+            try:
+                print(f"🔍 DEBUG: Processing collection {i}: type={type(col)}")
+                
+                # Handle different collection formats
+                col_info = {}
+                
+                # Try different ways to get collection ID
+                if hasattr(col, 'id'):
+                    col_info["id"] = col.id
+                    col_info["short_id"] = id_to_shorthand(col.id)
+                elif isinstance(col, dict) and 'id' in col:
+                    col_info["id"] = col['id']
+                    col_info["short_id"] = id_to_shorthand(col['id'])
+                elif isinstance(col, (list, tuple)) and len(col) > 0:
+                    # If it's a tuple/list, try to use first element as ID
+                    col_info["id"] = str(col[0])
+                    col_info["short_id"] = id_to_shorthand(str(col[0]))
+                else:
+                    # Fallback: use index as ID
+                    col_info["id"] = f"col_{i}"
+                    col_info["short_id"] = f"col_{i}"
+                
+                # Try to get other attributes
+                if hasattr(col, 'name'):
+                    col_info["name"] = col.name
+                elif isinstance(col, dict) and 'name' in col:
+                    col_info["name"] = col['name']
+                    
+                if hasattr(col, 'description'):
+                    col_info["description"] = col.description
+                elif isinstance(col, dict) and 'description' in col:
+                    col_info["description"] = col['description']
+                
+                # Add raw collection info for debugging
+                if isinstance(col, dict):
+                    col_info["raw_keys"] = list(col.keys())
+                elif hasattr(col, '__dict__'):
+                    col_info["raw_attrs"] = [attr for attr in dir(col) if not attr.startswith('_')]
+                
+                collection_list.append(col_info)
+                print(f"✅ DEBUG: Successfully processed collection {i}")
+                
+            except Exception as col_error:
+                print(f"💥 DEBUG: Error processing collection {i}: {str(col_error)}")
+                # Add error info but continue processing  
+                collection_list.append({
+                    "id": f"error_col_{i}",
+                    "short_id": f"err_{i}",
+                    "error": str(col_error),
+                    "col_type": str(type(col))
+                })
         
         return {
             "collections": collection_list,
-            "total": len(collections)
+            "total": len(collections),
+            "debug_info": {
+                "response_type": str(type(response)),
+                "collections_type": str(type(collections)),
+                "collections_length": len(collections) if collections else 0
+            }
         }
         
-    except Exception:
+    except Exception as e:
+        print(f"💥 DEBUG: list_collections error: {str(e)}")
         return {
             "collections": [],
-            "message": "Collections endpoint not available",
+            "message": f"Collections endpoint error: {str(e)}",
             "total": 0
         }
 
