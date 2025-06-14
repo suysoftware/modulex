@@ -50,42 +50,6 @@ async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db)):
     return tool_info
 
 
-@router.post("/{tool_name}/execute")
-async def execute_tool(
-    tool_name: str,
-    request: ToolExecutionRequest,
-    user_id: str = Query(..., description="User ID"),
-    db: AsyncSession = Depends(get_db)
-):
-    """Execute a tool action (supports both legacy and new formats)"""
-    tool_service = ToolService(db)
-    
-    try:
-        # Handle different request formats
-        if hasattr(request, 'action') and request.action:
-            # Legacy format: action is directly in the request
-            action = request.action
-            parameters = request.parameters or {}
-        elif hasattr(request, 'parameters') and request.parameters and 'action' in request.parameters:
-            # New format: action is inside parameters
-            parameters = request.parameters.copy()
-            action = parameters.pop('action')
-        else:
-            raise ValueError("Missing action parameter")
-        
-        result = await tool_service.execute_tool(
-            user_id=user_id,
-            tool_name=tool_name,
-            action=action,
-            parameters=parameters
-        )
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tool execution error: {str(e)}")
-
-
 # New endpoints for OpenAI/Vercel AI SDK compatibility
 @router.get("/openai/users/{user_id}/openai-tools")
 async def get_user_openai_tools(
