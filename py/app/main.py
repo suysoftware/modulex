@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ModuleX - Simplified",
     description="Simple tool authentication and execution server",
-    version="0.1.0",
+    version="0.1.2",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
@@ -49,7 +49,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "ModuleX - Simplified Version",
-        "version": "0.1.0",
+        "version": "0.1.2",
         "docs": "/docs",
         "endpoints": {
             "auth": {
@@ -60,19 +60,10 @@ async def root():
             "tools": {
                 "list_tools": "/tools/",
                 "get_tool_info": "/tools/{tool_name}",
-                "execute_tool": "/tools/{tool_name}/execute?user_id=YOUR_USER_ID"
+                "execute_tool": "/tools/{tool_name}/execute?user_id=YOUR_USER_ID",
+                "get_user_openai_tools": "/tools/openai/users/{user_id}/openai-tools"
             },
-            "openai_integration": {
-                "get_user_openai_tools": "/tools/openai/users/{user_id}/openai-tools",
-                "execute_tool_direct": "/tools/direct/{tool_name_action}/execute?user_id=YOUR_USER_ID"
-            }
         },
-        "vercel_ai_sdk_usage": {
-            "description": "For Vercel AI SDK integration",
-            "get_tools": "GET /tools/openai/users/{USER_ID}/openai-tools",
-            "execute_tool": "POST /tools/direct/{toolName_action}/execute?user_id={USER_ID}",
-            "note": "Tool names in execution should be in format: toolname_action (e.g., github_list_repositories)"
-        }
     }
 
 
