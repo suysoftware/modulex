@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.3] - 2025-06-14
+
+### Changes
+- 90d8c07 Merge pull request #6 from suysoftware/dev
+- beb2e9a Update README and main.py for tool execution enhancements
+- 6e2f862 Remove deprecated direct execution router from API and clean up error handling in tool retrieval
+- db0d870 Implement direct tool execution endpoint and update API paths
+- 77b7daf Add tool execution endpoint to support legacy and new request formats
+- ce61683 Merge branch 'main' of https://github.com/suysoftware/modulex into dev
+- 3c23a2d Add health check endpoint and example environment configuration
+
+
 ## [0.1.2] - 2025-06-12
 
 ### Changes
