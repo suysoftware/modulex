@@ -62,13 +62,13 @@ class ToolService:
             if not credentials:
                 # Try to clean up invalid credentials first
                 await self.auth_service.cleanup_invalid_credentials(user_id, tool_name)
-                raise ValueError(f"User {user_id} not authenticated for {tool_name}. Please complete OAuth flow.")
+                raise ValueError(f"User {user_id} not authenticated for {tool_name}. Please complete authentication.")
             
             # Check if credentials contain OAuth errors (additional safety check)
             if "error" in credentials and "access_token" not in credentials:
                 print(f"🧹 DEBUG: Found invalid credentials with error, cleaning up...")
                 await self.auth_service.cleanup_invalid_credentials(user_id, tool_name)
-                raise ValueError(f"Invalid authentication for {tool_name}. Please re-authenticate via OAuth.")
+                raise ValueError(f"Invalid authentication for {tool_name}. Please re-authenticate.")
 
             # Find tool script
             tool_script_path = self.integrations_path / tool_name / "main.py"
@@ -89,7 +89,8 @@ class ToolService:
                     execution_data = {
                         "action": action,
                         "parameters": parameters,
-                        "user_id": user_id
+                        "user_id": user_id,
+                        "user_credentials": credentials  # Pass credentials to all tools
                     }
                     
                     # Execute tool script in separate process (isolated environment)
@@ -160,12 +161,10 @@ class ToolService:
         # Debug: Log credentials structure (without exposing sensitive data)
         print(f"🔐 DEBUG: Credential keys available: {list(credentials.keys())}")
         
-        # Add common auth environment variables
+        # Add OAuth auth environment variables
         if "access_token" in credentials:
             env["ACCESS_TOKEN"] = credentials["access_token"]
             print("✅ ACCESS_TOKEN set from 'access_token' field")
-        else:
-            print("❌ 'access_token' field not found in credentials")
         
         if "refresh_token" in credentials:
             env["REFRESH_TOKEN"] = credentials["refresh_token"]
@@ -173,7 +172,7 @@ class ToolService:
         
         # Add other credential fields as environment variables
         for key, value in credentials.items():
-            if isinstance(value, str):
+            if isinstance(value, str) and key not in ["auth_type", "registered_at"]:
                 env[key.upper()] = value
                 print(f"🔑 Added env var: {key.upper()}")
         

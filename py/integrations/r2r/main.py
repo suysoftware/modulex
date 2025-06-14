@@ -5,53 +5,67 @@ R2R Integration - Main Script
 import json
 import sys
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
-def get_r2r_credentials() -> Dict[str, str]:
-    """Get R2R credentials from environment."""
-    api_base = os.getenv("R2R_API_BASE")
-    base_url = os.getenv("R2R_BASE_URL") 
-    api_key = os.getenv("R2R_API_KEY")
-    email = os.getenv("R2R_EMAIL")
-    password = os.getenv("R2R_PASSWORD")
-    
-    if not api_base or not base_url:
-        raise ValueError("R2R API base URL not found")
-    
-    return {
-        "api_base": api_base,
-        "base_url": base_url,
-        "api_key": api_key,
-        "email": email,
-        "password": password
-    }
+def get_r2r_credentials(user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+    """Get R2R credentials from user data or environment."""
+    # Priority: user_credentials > environment variables
+    if user_credentials and user_credentials.get("auth_type") == "manual":
+        # Use user-specific credentials from database
+        return {
+            "api_base": user_credentials.get("base_url") or os.getenv("R2R_API_BASE"),
+            "base_url": user_credentials.get("base_url") or os.getenv("R2R_BASE_URL"),
+            "api_key": None,  # Not used in manual auth
+            "email": user_credentials.get("email"),
+            "password": user_credentials.get("password")
+        }
+    else:
+        # Fallback to environment variables (backward compatibility)
+        api_base = os.getenv("R2R_API_BASE")
+        base_url = os.getenv("R2R_BASE_URL") 
+        api_key = os.getenv("R2R_API_KEY")
+        email = os.getenv("R2R_EMAIL")
+        password = os.getenv("R2R_PASSWORD")
+        
+        return {
+            "api_base": api_base,
+            "base_url": base_url,
+            "api_key": api_key,
+            "email": email,
+            "password": password
+        }
 
 
-def get_r2r_client():
-    """Initialize R2R client with user credentials."""
+def get_r2r_client(user_credentials: Optional[Dict[str, Any]] = None):
+    """Initialize R2R client with user-specific or environment credentials."""
     try:
         from r2r import R2RClient
     except ImportError:
         raise ValueError("R2R client not installed. Please install r2r package.")
     
-    credentials = get_r2r_credentials()
+    credentials = get_r2r_credentials(user_credentials)
+    
+    if not credentials["base_url"]:
+        raise ValueError("R2R base URL not found in user credentials or environment")
     
     # Initialize client with base URL
     client = R2RClient(base_url=credentials["base_url"])
     
-    # Login with user credentials if provided
+    # Login with credentials if provided
     if credentials["email"] and credentials["password"]:
         try:
             client.users.login(
                 email=credentials["email"],
                 password=credentials["password"]
             )
+            print(f"✅ DEBUG: R2R login successful for email: {credentials['email']}")
         except Exception as e:
             raise ValueError(f"R2R login failed: {str(e)}")
     elif credentials["api_key"]:
         # If API key is provided, we can use it for authentication
         # This might depend on R2R implementation
+        print(f"⚠️ DEBUG: Using API key authentication (implementation dependent)")
         pass
     else:
         raise ValueError("R2R credentials (email/password or API key) not found")
@@ -129,9 +143,9 @@ def format_search_results_for_llm(results) -> str:
     return result if result else "No results found."
 
 
-def search(parameters: Dict[str, Any]) -> Dict[str, Any]:
+def search(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Perform a vector search in the R2R knowledge base."""
-    client = get_r2r_client()
+    client = get_r2r_client(user_credentials)
     
     query = parameters["query"]
     limit = parameters.get("limit", 10)
@@ -150,9 +164,9 @@ def search(parameters: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def rag(parameters: Dict[str, Any]) -> Dict[str, Any]:
+def rag(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Perform a Retrieval-Augmented Generation query."""
-    client = get_r2r_client()
+    client = get_r2r_client(user_credentials)
     
     query = parameters["query"]
     use_hybrid = parameters.get("use_hybrid", False)
@@ -174,9 +188,9 @@ def rag(parameters: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def list_documents(parameters: Dict[str, Any]) -> Dict[str, Any]:
+def list_documents(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """List documents in the R2R system."""
-    client = get_r2r_client()
+    client = get_r2r_client(user_credentials)
     
     limit = parameters.get("limit", 10)
     offset = parameters.get("offset", 0)
@@ -215,9 +229,9 @@ def list_documents(parameters: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def get_document(parameters: Dict[str, Any]) -> Dict[str, Any]:
+def get_document(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Get detailed information about a specific document."""
-    client = get_r2r_client()
+    client = get_r2r_client(user_credentials)
     
     document_id = parameters["document_id"]
     
@@ -248,9 +262,9 @@ def get_document(parameters: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
-def list_collections(parameters: Dict[str, Any]) -> Dict[str, Any]:
+def list_collections(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """List collections in the R2R system."""
-    client = get_r2r_client()
+    client = get_r2r_client(user_credentials)
     
     try:
         response = client.collections.list()
@@ -289,18 +303,19 @@ def main():
         
         action = input_data.get("action")
         parameters = input_data.get("parameters", {})
+        user_credentials = input_data.get("user_credentials")  # Get credentials from execution data
         
         # Execute action
         if action == "search":
-            result = search(parameters)
+            result = search(parameters, user_credentials)
         elif action == "rag":
-            result = rag(parameters)
+            result = rag(parameters, user_credentials)
         elif action == "list_documents":
-            result = list_documents(parameters)
+            result = list_documents(parameters, user_credentials)
         elif action == "get_document":
-            result = get_document(parameters)
+            result = get_document(parameters, user_credentials)
         elif action == "list_collections":
-            result = list_collections(parameters)
+            result = list_collections(parameters, user_credentials)
         else:
             raise ValueError(f"Unknown action: {action}")
         

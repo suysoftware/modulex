@@ -49,6 +49,29 @@ class AuthService:
         self.oauth_state_prefix = "oauth_state:"  # Redis key prefix for namespacing
         self.oauth_state_ttl = 600  # 10 minutes TTL for security
     
+    async def register_manual_auth(self, user_id: str, tool_name: str, credentials: Dict[str, Any]) -> bool:
+        """Register credentials manually for any tool (no OAuth flow needed)"""
+        try:
+            # Prepare credentials data
+            credentials_data = {
+                **credentials,  # User provided credentials
+                "auth_type": "manual",
+                "registered_at": datetime.utcnow().isoformat()
+            }
+            
+            # Get or create user
+            user = await self.get_or_create_user(user_id)
+            
+            # Save credentials using existing method
+            await self._save_credentials(user, tool_name, credentials_data)
+            
+            print(f"✅ DEBUG: Manual auth registered for user_id={user_id}, tool_name={tool_name}")
+            return True
+            
+        except Exception as e:
+            print(f"💥 DEBUG: Manual auth failed for user_id={user_id}, tool_name={tool_name}: {str(e)}")
+            raise ValueError(f"Manual auth registration failed: {str(e)}")
+    
     async def get_or_create_user(self, external_id: str) -> User:
         """Get or create user by external ID"""
         result = await self.db.execute(
