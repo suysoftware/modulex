@@ -150,18 +150,69 @@ def search(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]
     query = parameters["query"]
     limit = parameters.get("limit", 10)
     
-    search_response = client.retrieval.search(
-        query=query,
-        limit=limit
-    )
-    
-    formatted_results = format_search_results_for_llm(search_response.results)
-    
-    return {
-        "results": formatted_results,
-        "query": query,
-        "limit": limit
-    }
+    try:
+        # Debug: Check what parameters search accepts
+        print(f"🔍 DEBUG: search method signature: {client.retrieval.search.__doc__}")
+        print(f"🔍 DEBUG: search method annotations: {getattr(client.retrieval.search, '__annotations__', 'No annotations')}")
+        
+        # Try search with different parameter combinations
+        try:
+            # First try: just query
+            search_response = client.retrieval.search(query=query)
+            print(f"✅ DEBUG: Search with only query parameter succeeded")
+        except Exception as e1:
+            print(f"💥 DEBUG: Search with query only failed: {str(e1)}")
+            try:
+                # Second try: different parameter name
+                search_response = client.retrieval.search(
+                    query=query,
+                    top_k=limit
+                )
+                print(f"✅ DEBUG: Search with top_k parameter succeeded")
+            except Exception as e2:
+                print(f"💥 DEBUG: Search with top_k failed: {str(e2)}")
+                try:
+                    # Third try: different parameter name
+                    search_response = client.retrieval.search(
+                        query=query,
+                        k=limit
+                    )
+                    print(f"✅ DEBUG: Search with k parameter succeeded")
+                except Exception as e3:
+                    print(f"💥 DEBUG: Search with k failed: {str(e3)}")
+                    try:
+                        # Fourth try: no limit parameter at all
+                        search_response = client.retrieval.search(query)
+                        print(f"✅ DEBUG: Search with positional query succeeded")
+                    except Exception as e4:
+                        print(f"💥 DEBUG: All search attempts failed: {str(e4)}")
+                        raise Exception(f"All search parameter combinations failed. Last error: {str(e4)}")
+        
+        # Debug response structure
+        print(f"🔍 DEBUG: search response type: {type(search_response)}")
+        print(f"🔍 DEBUG: search response attributes: {dir(search_response)}")
+        
+        # Handle response
+        if hasattr(search_response, 'results'):
+            results = search_response.results
+        else:
+            results = search_response
+            
+        formatted_results = format_search_results_for_llm(results)
+        
+        return {
+            "results": formatted_results,
+            "query": query,
+            "requested_limit": limit
+        }
+        
+    except Exception as e:
+        print(f"💥 DEBUG: search error: {str(e)}")
+        return {
+            "error": f"Search error: {str(e)}",
+            "query": query,
+            "requested_limit": limit
+        }
 
 
 def rag(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -172,20 +223,45 @@ def rag(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] =
     use_hybrid = parameters.get("use_hybrid", False)
     use_kg = parameters.get("use_kg", False)
     
-    rag_response = client.retrieval.rag(
-        query=query,
-        use_hybrid_search=use_hybrid,
-        use_kg_search=use_kg
-    )
-    
-    generated_answer = rag_response.results.generated_answer if hasattr(rag_response.results, 'generated_answer') else str(rag_response.results)
-    
-    return {
-        "answer": generated_answer,
-        "query": query,
-        "use_hybrid": use_hybrid,
-        "use_kg": use_kg
-    }
+    try:
+        # Debug: Check what parameters rag accepts
+        print(f"🔍 DEBUG: rag method signature: {client.retrieval.rag.__doc__}")
+        print(f"🔍 DEBUG: rag method annotations: {getattr(client.retrieval.rag, '__annotations__', 'No annotations')}")
+        
+        rag_response = client.retrieval.rag(
+            query=query,
+            use_hybrid_search=use_hybrid,
+            use_kg_search=use_kg
+        )
+        
+        # Debug response structure
+        print(f"🔍 DEBUG: rag response type: {type(rag_response)}")
+        print(f"🔍 DEBUG: rag response attributes: {dir(rag_response)}")
+        
+        # Handle response
+        if hasattr(rag_response, 'results'):
+            if hasattr(rag_response.results, 'generated_answer'):
+                generated_answer = rag_response.results.generated_answer
+            else:
+                generated_answer = str(rag_response.results)
+        else:
+            generated_answer = str(rag_response)
+        
+        return {
+            "answer": generated_answer,
+            "query": query,
+            "use_hybrid": use_hybrid,
+            "use_kg": use_kg
+        }
+        
+    except Exception as e:
+        print(f"💥 DEBUG: rag error: {str(e)}")
+        return {
+            "error": f"RAG error: {str(e)}",
+            "query": query,
+            "use_hybrid": use_hybrid,
+            "use_kg": use_kg
+        }
 
 
 def list_documents(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
