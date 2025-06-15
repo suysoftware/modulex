@@ -243,16 +243,17 @@ class AuthService:
             select(UserToolAuth).where(
                 UserToolAuth.user_id == user.id,
                 UserToolAuth.tool_name == tool_name,
-                UserToolAuth.is_authenticated == True
+                UserToolAuth.is_authenticated == True,
+                UserToolAuth.is_active == True
             )
         )
         auth_record = result.scalar_one_or_none()
         
         if not auth_record:
-            print(f"❌ DEBUG: No auth record found for user_id={user_id}, tool_name={tool_name}")
+            print(f"❌ DEBUG: No active auth record found for user_id={user_id}, tool_name={tool_name}")
             return None
         
-        print(f"✅ DEBUG: Auth record found for user_id={user_id}, tool_name={tool_name}")
+        print(f"✅ DEBUG: Active auth record found for user_id={user_id}, tool_name={tool_name}")
         
         try:
             decrypted_creds = decrypt_credentials(user.id, auth_record.encrypted_credentials)
@@ -278,12 +279,60 @@ class AuthService:
         for record in auth_records:
             tools.append({
                 "tool_name": record.tool_name,
+                "is_active": record.is_active,
                 "last_auth_at": record.last_auth_at,
                 "last_used_at": record.last_used_at,
                 "expires_at": record.auth_expires_at
             })
         
         return tools
+
+    async def get_user_active_tools(self, user_id: str) -> list:
+        """Get user's authenticated and active tools only"""
+        user = await self.get_or_create_user(user_id)
+        
+        result = await self.db.execute(
+            select(UserToolAuth).where(
+                UserToolAuth.user_id == user.id,
+                UserToolAuth.is_authenticated == True,
+                UserToolAuth.is_active == True
+            )
+        )
+        auth_records = result.scalars().all()
+        
+        tools = []
+        for record in auth_records:
+            tools.append({
+                "tool_name": record.tool_name,
+                "is_active": record.is_active,
+                "last_auth_at": record.last_auth_at,
+                "last_used_at": record.last_used_at,
+                "expires_at": record.auth_expires_at
+            })
+        
+        return tools
+
+    async def set_tool_active_status(self, user_id: str, tool_name: str, is_active: bool) -> bool:
+        """Set the active status of a user's authenticated tool"""
+        user = await self.get_or_create_user(user_id)
+        
+        result = await self.db.execute(
+            select(UserToolAuth).where(
+                UserToolAuth.user_id == user.id,
+                UserToolAuth.tool_name == tool_name,
+                UserToolAuth.is_authenticated == True
+            )
+        )
+        auth_record = result.scalar_one_or_none()
+        
+        if not auth_record:
+            return False
+        
+        auth_record.is_active = is_active
+        auth_record.updated_at = datetime.utcnow()
+        await self.db.commit()
+        
+        return True
     
     async def cleanup_expired_states(self):
         """Clean up expired OAuth states (Redis TTL handles this automatically)"""

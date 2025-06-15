@@ -37,6 +37,7 @@ class UserToolAuth(Base):
     # Authentication data (encrypted)
     encrypted_credentials = Column(Text, nullable=False)
     is_authenticated = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)  # New field: whether the tool is active/enabled
     auth_expires_at = Column(DateTime, nullable=True)
     
     # Metadata

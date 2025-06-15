@@ -1,7 +1,7 @@
 """
 Authentication API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 from pydantic import BaseModel
@@ -17,6 +17,11 @@ class ManualAuthRequest(BaseModel):
     user_id: str
     tool_name: str
     credentials: Dict[str, Any]  # Flexible credentials structure
+
+
+class ToolActiveStatusRequest(BaseModel):
+    """Request model for setting tool active status"""
+    is_active: bool
 
 
 @router.get("/url/{tool_name}")
@@ -95,17 +100,54 @@ async def auth_callback(
 @router.get("/tools")
 async def get_user_tools(
     user_id: str = Query(..., description="User ID"),
+    active_only: bool = Query(False, description="Return only active tools"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get user's authenticated tools"""
     auth_service = AuthService(db)
     
     try:
-        tools = await auth_service.get_user_tools(user_id)
+        if active_only:
+            tools = await auth_service.get_user_active_tools(user_id)
+        else:
+            tools = await auth_service.get_user_tools(user_id)
+        
         return {
             "user_id": user_id,
             "tools": tools,
-            "total": len(tools)
+            "total": len(tools),
+            "active_only": active_only
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving tools: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error retrieving tools: {str(e)}")
+
+
+@router.put("/users/{user_id}/tools/{tool_name}/status")
+async def set_tool_active_status(
+    user_id: str = Path(..., description="User ID"),
+    tool_name: str = Path(..., description="Tool name"),
+    request: ToolActiveStatusRequest = ...,
+    db: AsyncSession = Depends(get_db)
+):
+    """Set the active status of a user's authenticated tool"""
+    auth_service = AuthService(db)
+    
+    try:
+        success = await auth_service.set_tool_active_status(user_id, tool_name, request.is_active)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Tool {tool_name} not found or not authenticated for user {user_id}"
+            )
+        
+        return {
+            "success": True,
+            "message": f"Tool {tool_name} {'activated' if request.is_active else 'deactivated'} successfully",
+            "user_id": user_id,
+            "tool_name": tool_name,
+            "is_active": request.is_active
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating tool status: {str(e)}") 
