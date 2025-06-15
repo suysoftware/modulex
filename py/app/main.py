@@ -7,33 +7,8 @@ from contextlib import asynccontextmanager
 
 from .core.config import settings, verify_api_key, get_api_key_info
 from .core.database import create_tables
-from .api import auth, tools
-
-
-async def run_migrations():
-    """Run database migrations on startup"""
-    try:
-        print("🔄 Running database migrations...")
-        
-        # Import and run the migration
-        import sys
-        import os
-        from pathlib import Path
-        
-        # Add migrations directory to path
-        migrations_path = Path(__file__).parent.parent / "migrations"
-        sys.path.insert(0, str(migrations_path))
-        
-        # Import and run migration
-        from add_is_active_column import run_migration
-        await run_migration()
-        
-        print("✅ Database migrations completed")
-        
-    except Exception as e:
-        print(f"⚠️ Migration warning: {str(e)}")
-        # Don't fail startup if migration fails
-        pass
+from .api import auth, tools, system
+from .api.system import run_migrations_for_startup
 
 
 @asynccontextmanager
@@ -41,7 +16,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan"""
     # Startup
     await create_tables()
-    await run_migrations()  # Run migrations after table creation
+    await run_migrations_for_startup()  # Run migrations after table creation
     yield
     # Shutdown
     pass
@@ -69,6 +44,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(tools.router)
+app.include_router(system.router)
 
 
 @app.get("/")
@@ -91,68 +67,13 @@ async def root():
                 "execute_tool": "/tools/{tool_name}/execute?user_id=YOUR_USER_ID",
                 "get_user_openai_tools": "/tools/openai/users/{user_id}/openai-tools"
             },
-            "admin": {
-                "database_update": "/admin/database/update",
-                "database_rollback": "/admin/database/rollback"
+            "system": {
+                "health": "/system/health",
+                "database_update": "/system/database/update",
+                "database_rollback": "/system/database/rollback"
             }
         }
     }
-
-
-@app.get("/health/")
-async def health_check():
-    """Health check endpoint for Railway"""
-    return {"status": "healthy", "service": "ModuleX"}
-
-
-@app.post("/admin/database/update")
-async def update_database(
-    _: bool = Depends(verify_api_key)
-):
-    """Update database schema (run migrations) - Protected by API key"""
-    try:
-        await run_migrations()
-        return {
-            "success": True, 
-            "message": "Database updated successfully",
-            "operation": "migration"
-        }
-    except Exception as e:
-        return {
-            "success": False, 
-            "error": str(e),
-            "operation": "migration"
-        }
-
-
-@app.post("/admin/database/rollback")
-async def rollback_database(
-    _: bool = Depends(verify_api_key)
-):
-    """Rollback database schema changes - Protected by API key"""
-    try:
-        import sys
-        from pathlib import Path
-        
-        # Add migrations directory to path
-        migrations_path = Path(__file__).parent.parent / "migrations"
-        sys.path.insert(0, str(migrations_path))
-        
-        # Import and run rollback
-        from add_is_active_column import rollback_migration
-        await rollback_migration()
-        
-        return {
-            "success": True, 
-            "message": "Database rollback completed successfully",
-            "operation": "rollback"
-        }
-    except Exception as e:
-        return {
-            "success": False, 
-            "error": str(e),
-            "operation": "rollback"
-        }
 
 
 if __name__ == "__main__":
