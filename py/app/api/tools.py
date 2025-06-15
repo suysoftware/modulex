@@ -109,11 +109,16 @@ async def get_user_openai_tools(
         
         for user_tool in user_tools:
             tool_name = user_tool["tool_name"]
+            disabled_actions = user_tool.get("disabled_actions", [])
             tool_info = await tool_service.get_tool_info(tool_name)
             
             if tool_info and tool_info.get("actions"):
                 for action in tool_info["actions"]:
-                    # Convert each action to OpenAI tool format
+                    # Skip disabled actions
+                    if action['name'] in disabled_actions:
+                        continue
+                    
+                    # Convert each enabled action to OpenAI tool format
                     openai_tool = {
                         "type": "function",
                         "function": {

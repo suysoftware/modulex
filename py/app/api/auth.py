@@ -24,6 +24,11 @@ class ToolActiveStatusRequest(BaseModel):
     is_active: bool
 
 
+class ActionDisabledStatusRequest(BaseModel):
+    """Request model for setting action disabled status"""
+    is_disabled: bool
+
+
 @router.get("/url/{tool_name}")
 async def get_auth_url(
     tool_name: str,
@@ -100,23 +105,20 @@ async def auth_callback(
 @router.get("/tools")
 async def get_user_tools(
     user_id: str = Query(..., description="User ID"),
-    active_only: bool = Query(False, description="Return only active tools"),
+    detail: bool = Query(False, description="Return detailed tool information"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get user's authenticated tools"""
+    """Get all available tools with user authentication and active status"""
     auth_service = AuthService(db)
     
     try:
-        if active_only:
-            tools = await auth_service.get_user_active_tools(user_id)
-        else:
-            tools = await auth_service.get_user_tools(user_id)
+        tools = await auth_service.get_all_tools_with_user_status(user_id, detail)
         
         return {
             "user_id": user_id,
             "tools": tools,
             "total": len(tools),
-            "active_only": active_only
+            "detail": detail
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving tools: {str(e)}")
@@ -150,4 +152,39 @@ async def set_tool_active_status(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating tool status: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error updating tool status: {str(e)}")
+
+
+@router.put("/users/{user_id}/tools/{tool_name}/actions/{action_name}/status")
+async def set_action_disabled_status(
+    user_id: str = Path(..., description="User ID"),
+    tool_name: str = Path(..., description="Tool name"),
+    action_name: str = Path(..., description="Action name"),
+    request: ActionDisabledStatusRequest = ...,
+    db: AsyncSession = Depends(get_db)
+):
+    """Enable or disable a specific action for a user's tool"""
+    auth_service = AuthService(db)
+    
+    try:
+        success = await auth_service.set_action_disabled_status(
+            user_id, tool_name, action_name, request.is_disabled
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Tool {tool_name} not found or not authenticated for user {user_id}"
+            )
+        
+        return {
+            "success": True,
+            "message": f"Action '{action_name}' for tool '{tool_name}' {'disabled' if request.is_disabled else 'enabled'} successfully",
+            "user_id": user_id,
+            "tool_name": tool_name,
+            "action_name": action_name,
+            "is_disabled": request.is_disabled
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating action status: {str(e)}") 

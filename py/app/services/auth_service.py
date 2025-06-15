@@ -280,6 +280,7 @@ class AuthService:
             tools.append({
                 "tool_name": record.tool_name,
                 "is_active": record.is_active,
+                "disabled_actions": record.disabled_actions or [],
                 "last_auth_at": record.last_auth_at,
                 "last_used_at": record.last_used_at,
                 "expires_at": record.auth_expires_at
@@ -305,6 +306,7 @@ class AuthService:
             tools.append({
                 "tool_name": record.tool_name,
                 "is_active": record.is_active,
+                "disabled_actions": record.disabled_actions or [],
                 "last_auth_at": record.last_auth_at,
                 "last_used_at": record.last_used_at,
                 "expires_at": record.auth_expires_at
@@ -333,6 +335,80 @@ class AuthService:
         await self.db.commit()
         
         return True
+
+    async def set_action_disabled_status(self, user_id: str, tool_name: str, action_name: str, is_disabled: bool) -> bool:
+        """Enable or disable a specific action for a user's tool"""
+        user = await self.get_or_create_user(user_id)
+        
+        result = await self.db.execute(
+            select(UserToolAuth).where(
+                UserToolAuth.user_id == user.id,
+                UserToolAuth.tool_name == tool_name,
+                UserToolAuth.is_authenticated == True
+            )
+        )
+        auth_record = result.scalar_one_or_none()
+        
+        if not auth_record:
+            return False
+        
+        # Initialize disabled_actions if None
+        disabled_actions = auth_record.disabled_actions or []
+        
+        if is_disabled:
+            # Add action to disabled list if not already there
+            if action_name not in disabled_actions:
+                disabled_actions.append(action_name)
+        else:
+            # Remove action from disabled list if it exists
+            if action_name in disabled_actions:
+                disabled_actions.remove(action_name)
+        
+        auth_record.disabled_actions = disabled_actions
+        auth_record.updated_at = datetime.utcnow()
+        await self.db.commit()
+        
+        return True
+
+    async def get_user_disabled_actions(self, user_id: str, tool_name: str) -> list:
+        """Get list of disabled actions for a specific tool"""
+        user = await self.get_or_create_user(user_id)
+        
+        result = await self.db.execute(
+            select(UserToolAuth).where(
+                UserToolAuth.user_id == user.id,
+                UserToolAuth.tool_name == tool_name,
+                UserToolAuth.is_authenticated == True
+            )
+        )
+        auth_record = result.scalar_one_or_none()
+        
+        if not auth_record:
+            return []
+        
+        return auth_record.disabled_actions or []
+
+    async def is_action_enabled(self, user_id: str, tool_name: str, action_name: str) -> bool:
+        """Check if a specific action is enabled for a user's tool"""
+        # First check if tool is active
+        user = await self.get_or_create_user(user_id)
+        
+        result = await self.db.execute(
+            select(UserToolAuth).where(
+                UserToolAuth.user_id == user.id,
+                UserToolAuth.tool_name == tool_name,
+                UserToolAuth.is_authenticated == True,
+                UserToolAuth.is_active == True
+            )
+        )
+        auth_record = result.scalar_one_or_none()
+        
+        if not auth_record:
+            return False
+        
+        # Check if action is not in disabled list
+        disabled_actions = auth_record.disabled_actions or []
+        return action_name not in disabled_actions
     
     async def cleanup_expired_states(self):
         """Clean up expired OAuth states (Redis TTL handles this automatically)"""
@@ -389,4 +465,68 @@ class AuthService:
         except Exception as e:
             print(f"💥 DEBUG: Error checking credentials for cleanup: {e}")
         
-        return False 
+        return False
+
+    async def get_all_tools_with_user_status(self, user_id: str, detail: bool = False):
+        """Get all available tools with user authentication and active status"""
+        # Import here to avoid circular import
+        from ..services.tool_service import ToolService
+        tool_service = ToolService(self.db)
+        
+        # Get all available tools
+        available_tools = await tool_service.list_available_tools()
+        
+        # Get user's authenticated tools
+        user = await self.get_or_create_user(user_id)
+        result = await self.db.execute(
+            select(UserToolAuth).where(
+                UserToolAuth.user_id == user.id
+            )
+        )
+        user_auth_records = {record.tool_name: record for record in result.scalars().all()}
+        
+        tools_with_status = []
+        
+        for tool in available_tools:
+            tool_name = tool["name"]
+            auth_record = user_auth_records.get(tool_name)
+            
+            # Determine authentication and active status
+            is_authenticated = auth_record is not None and auth_record.is_authenticated
+            is_active = is_authenticated and auth_record.is_active if auth_record else False
+            disabled_actions = auth_record.disabled_actions if auth_record else []
+            
+            # Prepare actions with is_active status
+            actions_with_status = []
+            if tool.get("actions"):
+                for action in tool["actions"]:
+                    action_is_active = is_active and action["name"] not in (disabled_actions or [])
+                    actions_with_status.append({
+                        "name": action["name"],
+                        "description": action.get("description", ""),
+                        "is_active": action_is_active
+                    })
+            
+            # Build tool response based on detail level
+            tool_response = {
+                "name": tool["name"],
+                "display_name": tool.get("display_name", tool["name"]),
+                "is_authenticated": is_authenticated,
+                "is_active": is_active,
+                "health_status": True,  # TODO: Implement actual health check
+                "actions": actions_with_status
+            }
+            
+            # Add detailed information if requested
+            if detail:
+                tool_response.update({
+                    "description": tool.get("description", ""),
+                    "version": tool.get("version", "1.0.0"),
+                    "author": tool.get("author", "Unknown"),
+                    "requires_auth": tool.get("requires_auth", True),
+                    "auth_type": tool.get("auth_type", "oauth2")
+                })
+            
+            tools_with_status.append(tool_response)
+        
+        return tools_with_status 
