@@ -370,46 +370,6 @@ class AuthService:
         
         return True
 
-    async def get_user_disabled_actions(self, user_id: str, tool_name: str) -> list:
-        """Get list of disabled actions for a specific tool"""
-        user = await self.get_or_create_user(user_id)
-        
-        result = await self.db.execute(
-            select(UserToolAuth).where(
-                UserToolAuth.user_id == user.id,
-                UserToolAuth.tool_name == tool_name,
-                UserToolAuth.is_authenticated == True
-            )
-        )
-        auth_record = result.scalar_one_or_none()
-        
-        if not auth_record:
-            return []
-        
-        return auth_record.disabled_actions or []
-
-    async def is_action_enabled(self, user_id: str, tool_name: str, action_name: str) -> bool:
-        """Check if a specific action is enabled for a user's tool"""
-        # First check if tool is active
-        user = await self.get_or_create_user(user_id)
-        
-        result = await self.db.execute(
-            select(UserToolAuth).where(
-                UserToolAuth.user_id == user.id,
-                UserToolAuth.tool_name == tool_name,
-                UserToolAuth.is_authenticated == True,
-                UserToolAuth.is_active == True
-            )
-        )
-        auth_record = result.scalar_one_or_none()
-        
-        if not auth_record:
-            return False
-        
-        # Check if action is not in disabled list
-        disabled_actions = auth_record.disabled_actions or []
-        return action_name not in disabled_actions
-    
     async def cleanup_expired_states(self):
         """Clean up expired OAuth states (Redis TTL handles this automatically)"""
         # Redis TTL automatically cleans up expired keys

@@ -62,8 +62,8 @@ async def root():
                 "get_tool_info": "/tools/{tool_name}",
                 "execute_tool": "/tools/{tool_name}/execute?user_id=YOUR_USER_ID",
                 "get_user_openai_tools": "/tools/openai/users/{user_id}/openai-tools"
-            },
-        },
+            }
+        }
     }
 
 

@@ -156,28 +156,3 @@ async def get_user_openai_tools(
         import logging
         logging.error(f"Error retrieving OpenAI tools for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving OpenAI tools: {str(e)}")
-
-
-@router.get("/users/{user_id}/tools")
-async def get_user_tools_with_status(
-    user_id: str = Path(..., description="User ID"),
-    active_only: bool = Query(False, description="Return only active tools"),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get user's authenticated tools with their active status"""
-    auth_service = AuthService(db)
-    
-    try:
-        if active_only:
-            tools = await auth_service.get_user_active_tools(user_id)
-        else:
-            tools = await auth_service.get_user_tools(user_id)
-        
-        return {
-            "user_id": user_id,
-            "tools": tools,
-            "total": len(tools),
-            "active_only": active_only
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving tools: {str(e)}")

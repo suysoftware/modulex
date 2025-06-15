@@ -57,16 +57,6 @@ class ToolService:
         self._queued_executions += 1
         
         try:
-            # Check if the specific action is enabled for this user
-            action_enabled = await self.auth_service.is_action_enabled(user_id, tool_name, action)
-            if not action_enabled:
-                return {
-                    "success": False,
-                    "error": f"Action '{action}' is disabled for tool '{tool_name}'. Please enable it first.",
-                    "tool_name": tool_name,
-                    "action": action
-                }
-            
             # Get user credentials
             credentials = await self.auth_service.get_user_credentials(user_id, tool_name)
             if not credentials:
@@ -226,11 +216,3 @@ class ToolService:
                     })
         
         return tools
-    
-    async def get_execution_stats(self) -> Dict[str, int]:
-        """Get current execution statistics"""
-        return {
-            "active_executions": self._active_executions,
-            "queued_executions": self._queued_executions,
-            "available_slots": self._execution_semaphore._value
-        } 

@@ -5,7 +5,7 @@ ModuleX is a simple tool authentication and execution server that supports OAuth
 
 **Base URL:** `http://localhost:8000`  
 **Version:** `0.1.2`  
-**Total Endpoints:** `14`
+**Total Endpoints:** `13`
 
 ## Endpoint Summary
 
@@ -13,8 +13,8 @@ ModuleX is a simple tool authentication and execution server that supports OAuth
 |----------|--------|-------------|
 | **Main App** | 2 | Root and health check endpoints |
 | **Authentication** | 7 | OAuth flows, manual auth, tool and action management |
-| **Tools** | 5 | Tool listing, execution, and OpenAI integration |
-| **Total** | **14** | All available endpoints |
+| **Tools** | 4 | Tool listing, execution, and OpenAI integration |
+| **Total** | **13** | All available endpoints |
 
 ---
 
@@ -164,7 +164,6 @@ GET /auth/tools?user_id=user123
 **Basic Response Example:**
 ```json
 {
-  "user_id": "user123",
   "tools": [
     {
       "name": "github",
@@ -199,9 +198,7 @@ GET /auth/tools?user_id=user123
         }
       ]
     }
-  ],
-  "total": 2,
-  "detail": false
+  ]
 }
 ```
 
@@ -213,7 +210,6 @@ GET /auth/tools?user_id=user123&detail=true
 **Detailed Response Example:**
 ```json
 {
-  "user_id": "user123",
   "tools": [
     {
       "name": "github",
@@ -239,9 +235,7 @@ GET /auth/tools?user_id=user123&detail=true
         }
       ]
     }
-  ],
-  "total": 1,
-  "detail": true
+  ]
 }
 ```
 
@@ -434,15 +428,7 @@ GET /tools/github
 }
 ```
 
-**Disabled Action Response Example:**
-```json
-{
-  "success": false,
-  "error": "Action 'create_repository' is disabled for tool 'github'. Please enable it first.",
-  "tool_name": "github",
-  "action": "create_repository"
-}
-```
+**Note:** Disabled actions are filtered out at the client level through the `/auth/tools` and `/tools/openai/users/{user_id}/openai-tools` endpoints, so execution requests for disabled actions are unlikely to occur.
 
 ### 4. Get OpenAI Tools (Vercel AI SDK)
 - **Method:** `GET`
@@ -486,42 +472,6 @@ GET /tools/openai/users/user123/openai-tools
 ```
 
 **Note:** Only enabled actions from active tools are returned. Disabled actions are filtered out automatically.
-
-### 5. Get User Tools (Tools Module)
-- **Method:** `GET`
-- **Path:** `/tools/users/{user_id}/tools`
-- **Description:** Get user's authenticated tools from the tools module
-- **Authentication:** User ID required
-
-**Path Parameters:**
-- `user_id` (string): User identifier
-
-**Query Parameters:**
-- `active_only` (boolean, optional): Return only active tools (default: false)
-
-**Request Example:**
-```bash
-GET /tools/users/user123/tools?active_only=true
-```
-
-**Response Example:**
-```json
-{
-  "user_id": "user123",
-  "tools": [
-    {
-      "tool_name": "github",
-      "is_active": true,
-      "disabled_actions": ["create_repository"],
-      "last_auth_at": "2024-01-15T10:30:00Z",
-      "last_used_at": "2024-01-15T11:00:00Z",
-      "expires_at": null
-    }
-  ],
-  "total": 1,
-  "active_only": true
-}
-```
 
 ---
 
@@ -568,18 +518,14 @@ PUT /auth/users/user123/tools/github/actions/create_repository/status
 # 6. Check tools again to see action status
 GET /auth/tools?user_id=user123
 
-# 7. Try to execute disabled action (will fail)
-POST /tools/github/execute?user_id=user123
-{"action": "create_repository", "parameters": {"name": "test"}}
-
-# 8. Check OpenAI tools (disabled actions won't appear)
+# 7. Check OpenAI tools (disabled actions won't appear)
 GET /tools/openai/users/user123/openai-tools
 
-# 9. Re-enable the action
+# 8. Re-enable the action
 PUT /auth/users/user123/tools/github/actions/create_repository/status
 {"is_disabled": false}
 
-# 10. Deactivate entire tool
+# 9. Deactivate entire tool
 PUT /auth/users/user123/tools/github/status
 {"is_active": false}
 ```
@@ -635,7 +581,6 @@ PUT /auth/users/user123/tools/custom_api/actions/delete_data/status
 - `Invalid authentication for {tool_name}. Please re-authenticate.`
 
 ### Action Management Errors
-- `Action '{action_name}' is disabled for tool '{tool_name}'. Please enable it first.`
 - `Tool {tool_name} not found or not authenticated for user {user_id}`
 
 ---
