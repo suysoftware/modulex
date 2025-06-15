@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from ..core.database import get_db
 from ..services.auth_service import AuthService
+from ..core.config import verify_api_key
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -33,7 +34,8 @@ class ActionDisabledStatusRequest(BaseModel):
 async def get_auth_url(
     tool_name: str,
     user_id: str = Query(..., description="User ID"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Get OAuth authorization URL for a tool"""
     auth_service = AuthService(db)
@@ -52,7 +54,8 @@ async def get_auth_url(
 @router.post("/manual")
 async def register_manual_auth(
     request: ManualAuthRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Register credentials manually for any tool (no OAuth flow needed)"""
     auth_service = AuthService(db)
@@ -85,7 +88,8 @@ async def auth_callback(
     tool_name: str,
     code: str = Query(...),
     state: str = Query(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Handle OAuth callback"""
     auth_service = AuthService(db)
@@ -106,7 +110,8 @@ async def auth_callback(
 async def get_user_tools(
     user_id: str = Query(..., description="User ID"),
     detail: bool = Query(False, description="Return detailed tool information"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Get all available tools with user authentication and active status"""
     auth_service = AuthService(db)
@@ -126,7 +131,8 @@ async def set_tool_active_status(
     user_id: str = Path(..., description="User ID"),
     tool_name: str = Path(..., description="Tool name"),
     request: ToolActiveStatusRequest = ...,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Set the active status of a user's authenticated tool"""
     auth_service = AuthService(db)
@@ -158,7 +164,8 @@ async def set_action_disabled_status(
     tool_name: str = Path(..., description="Tool name"),
     action_name: str = Path(..., description="Action name"),
     request: ActionDisabledStatusRequest = ...,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Enable or disable a specific action for a user's tool"""
     auth_service = AuthService(db)

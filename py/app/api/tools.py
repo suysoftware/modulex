@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from ..core.database import get_db
 from ..services.tool_service import ToolService
 from ..services.auth_service import AuthService
+from ..core.config import verify_api_key
 
 router = APIRouter(prefix="/tools", tags=["Tools"])
 
@@ -24,7 +25,7 @@ class OpenAIToolExecutionRequest(BaseModel):
 
 
 @router.get("/")
-async def list_tools(db: AsyncSession = Depends(get_db)):
+async def list_tools(db: AsyncSession = Depends(get_db), _: bool = Depends(verify_api_key)):
     """List all available tools"""
     tool_service = ToolService(db)
     
@@ -39,7 +40,7 @@ async def list_tools(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{tool_name}")
-async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db)):
+async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db), _: bool = Depends(verify_api_key)):
     """Get information about a specific tool"""
     tool_service = ToolService(db)
     
@@ -55,7 +56,8 @@ async def execute_tool(
     tool_name: str,
     request: ToolExecutionRequest,
     user_id: str = Query(..., description="User ID"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Execute a tool action (supports both legacy and new formats)"""
     tool_service = ToolService(db)
@@ -90,7 +92,8 @@ async def execute_tool(
 @router.get("/openai/users/{user_id}/openai-tools")
 async def get_user_openai_tools(
     user_id: str = Path(..., description="User ID"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Get user's authenticated and active tools in OpenAI tools format for Vercel AI SDK"""
     auth_service = AuthService(db)
