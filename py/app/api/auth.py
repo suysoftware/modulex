@@ -115,10 +115,7 @@ async def get_user_tools(
         tools = await auth_service.get_all_tools_with_user_status(user_id, detail)
         
         return {
-            "user_id": user_id,
             "tools": tools,
-            "total": len(tools),
-            "detail": detail
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving tools: {str(e)}")
