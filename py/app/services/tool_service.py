@@ -5,13 +5,17 @@ import subprocess
 import os
 import json
 import asyncio
+import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
+from functools import lru_cache
 
 from .auth_service import AuthService
 from ..config.load_config import get_load_config
 
+# Configure logger for tool service
+logger = logging.getLogger(__name__)
 
 class ToolService:
     """Service for executing tools"""
@@ -36,8 +40,8 @@ class ToolService:
         self._active_executions = 0
         self._queued_executions = 0
         
-        print(f"🚀 ToolService initialized with {max_concurrent_executions} concurrent executions")
-        print(f"📊 Load config: {os.getenv('LOAD_CONFIG', 'medium')}")
+        logger.info(f"ToolService initialized with {max_concurrent_executions} concurrent executions")
+        logger.info(f"Load config: {os.getenv('LOAD_CONFIG', 'medium')}")
     
     async def execute_tool(self, user_id: str, tool_name: str, action: str, parameters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Execute a tool action for a user"""
@@ -66,7 +70,7 @@ class ToolService:
             
             # Check if credentials contain OAuth errors (additional safety check)
             if "error" in credentials and "access_token" not in credentials:
-                print(f"🧹 DEBUG: Found invalid credentials with error, cleaning up...")
+                logger.debug(f"Found invalid credentials with error, cleaning up for user {user_id}")
                 await self.auth_service.cleanup_invalid_credentials(user_id, tool_name)
                 raise ValueError(f"Invalid authentication for {tool_name}. Please re-authenticate.")
 
@@ -154,29 +158,52 @@ class ToolService:
             if self._queued_executions > 0:
                 self._queued_executions -= 1
     
+    @lru_cache(maxsize=1000)
+    def _get_excluded_credential_keys(self) -> frozenset:
+        """Cache excluded credential keys for performance"""
+        return frozenset(["auth_type", "registered_at"])
+
     def _prepare_tool_env(self, credentials: Dict[str, Any]) -> Dict[str, str]:
-        """Prepare environment variables for tool execution"""
+        """Prepare environment variables for tool execution
+        
+        Optimized for high-concurrency scenarios:
+        - Minimal logging with level checks
+        - Efficient dictionary operations
+        - Cached exclude list
+        """
         env = {}
+        excluded_keys = self._get_excluded_credential_keys()
         
-        # Debug: Log credentials structure (without exposing sensitive data)
-        print(f"🔐 DEBUG: Credential keys available: {list(credentials.keys())}")
+        # Debug logging only if enabled (prevents I/O overhead)
+        debug_enabled = logger.isEnabledFor(logging.DEBUG)
         
-        # Add OAuth auth environment variables
-        if "access_token" in credentials:
-            env["ACCESS_TOKEN"] = credentials["access_token"]
-            print("✅ ACCESS_TOKEN set from 'access_token' field")
+        if debug_enabled:
+            logger.debug(f"Preparing env for credential keys: {list(credentials.keys())}")
         
-        if "refresh_token" in credentials:
-            env["REFRESH_TOKEN"] = credentials["refresh_token"]
-            print("✅ REFRESH_TOKEN set from 'refresh_token' field")
+        # Add OAuth auth environment variables (most common case first)
+        access_token = credentials.get("access_token")
+        if access_token:
+            env["ACCESS_TOKEN"] = access_token
+            if debug_enabled:
+                logger.debug("ACCESS_TOKEN configured")
+        
+        refresh_token = credentials.get("refresh_token")
+        if refresh_token:
+            env["REFRESH_TOKEN"] = refresh_token
+            if debug_enabled:
+                logger.debug("REFRESH_TOKEN configured")
         
         # Add other credential fields as environment variables
-        for key, value in credentials.items():
-            if isinstance(value, str) and key not in ["auth_type", "registered_at"]:
-                env[key.upper()] = value
-                print(f"🔑 Added env var: {key.upper()}")
+        # Using dict comprehension for better performance
+        env.update({
+            key.upper(): value 
+            for key, value in credentials.items() 
+            if isinstance(value, str) and key not in excluded_keys
+        })
         
-        print(f"🌍 Environment variables set: {list(env.keys())}")
+        if debug_enabled:
+            logger.debug(f"Environment prepared with {len(env)} variables")
+        
         return env
     
     async def get_tool_info(self, tool_name: str) -> Optional[Dict[str, Any]]:
