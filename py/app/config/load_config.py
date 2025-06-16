@@ -105,7 +105,7 @@ def get_load_config() -> LoadConfig:
             memory_threshold=float(os.getenv("MEMORY_THRESHOLD", "0.85"))
         )
 
-# Usage examples for different scenarios:
+# Usage examples for different scenarios :
 
 # 10,000 users, 500 active → Use "large" or "enterprise"
 # 1,000 users, 50 active → Use "medium" 
