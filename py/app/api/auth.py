@@ -2,6 +2,7 @@
 Authentication API Endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 from pydantic import BaseModel
@@ -14,6 +15,407 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Separate router for callback endpoints (no API key required)
 callback_router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def get_success_html(tool_name: str) -> str:
+    """Generate success HTML page"""
+    tool_display_names = {
+        "github": "GitHub",
+        "google": "Google",
+        "slack": "Slack",
+        "gitlab": "GitLab",
+        "bitbucket": "Bitbucket"
+    }
+    
+    display_name = tool_display_names.get(tool_name, tool_name.title())
+    
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Authentication Successful - ModuleX</title>
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                min-height: 100vh;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }}
+            
+            .container {{
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                padding: 40px;
+                max-width: 500px;
+                width: 100%;
+                text-align: center;
+                animation: slideUp 0.6s ease-out;
+            }}
+            
+            @keyframes slideUp {{
+                from {{
+                    opacity: 0;
+                    transform: translateY(30px);
+                }}
+                to {{
+                    opacity: 1;
+                    transform: translateY(0);
+                }}
+            }}
+            
+            .success-icon {{
+                width: 80px;
+                height: 80px;
+                background: #10B981;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 24px;
+                animation: checkmark 0.6s ease-in-out 0.3s both;
+            }}
+            
+            @keyframes checkmark {{
+                0% {{
+                    transform: scale(0);
+                }}
+                50% {{
+                    transform: scale(1.2);
+                }}
+                100% {{
+                    transform: scale(1);
+                }}
+            }}
+            
+            .checkmark {{
+                width: 32px;
+                height: 32px;
+                color: white;
+            }}
+            
+            .title {{
+                font-size: 28px;
+                font-weight: 700;
+                color: #1F2937;
+                margin-bottom: 12px;
+            }}
+            
+            .subtitle {{
+                font-size: 16px;
+                color: #6B7280;
+                margin-bottom: 32px;
+                line-height: 1.5;
+            }}
+            
+            .tool-info {{
+                background: #F3F4F6;
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 32px;
+            }}
+            
+            .tool-name {{
+                font-size: 18px;
+                font-weight: 600;
+                color: #374151;
+                margin-bottom: 8px;
+            }}
+            
+            .tool-status {{
+                font-size: 14px;
+                color: #059669;
+                font-weight: 500;
+            }}
+            
+            .close-button {{
+                background: #6366F1;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 32px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }}
+            
+            .close-button:hover {{
+                background: #5B21B6;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+            }}
+            
+            .footer {{
+                margin-top: 24px;
+                font-size: 12px;
+                color: #9CA3AF;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="success-icon">
+                <svg class="checkmark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            
+            <h1 class="title">Authentication Successful!</h1>
+            <p class="subtitle">
+                You have successfully connected your {display_name} account to ModuleX.
+                You can now close this window and return to your application.
+            </p>
+            
+            <div class="tool-info">
+                <div class="tool-name">{display_name}</div>
+                <div class="tool-status">✓ Successfully Connected</div>
+            </div>
+            
+            <button class="close-button" onclick="window.close()">
+                Close Window
+            </button>
+            
+            <div class="footer">
+                Powered by ModuleX • Authentication System
+            </div>
+        </div>
+        
+        <script>
+            // Auto-close after 10 seconds if user doesn't close manually
+            setTimeout(() => {{
+                if (window.opener) {{
+                    window.close();
+                }}
+            }}, 10000);
+        </script>
+    </body>
+    </html>
+    """
+
+
+def get_error_html(tool_name: str, error_message: str) -> str:
+    """Generate error HTML page"""
+    tool_display_names = {
+        "github": "GitHub",
+        "google": "Google", 
+        "slack": "Slack",
+        "gitlab": "GitLab",
+        "bitbucket": "Bitbucket"
+    }
+    
+    display_name = tool_display_names.get(tool_name, tool_name.title())
+    
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Authentication Failed - ModuleX</title>
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                min-height: 100vh;
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }}
+            
+            .container {{
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                padding: 40px;
+                max-width: 500px;
+                width: 100%;
+                text-align: center;
+                animation: slideUp 0.6s ease-out;
+            }}
+            
+            @keyframes slideUp {{
+                from {{
+                    opacity: 0;
+                    transform: translateY(30px);
+                }}
+                to {{
+                    opacity: 1;
+                    transform: translateY(0);
+                }}
+            }}
+            
+            .error-icon {{
+                width: 80px;
+                height: 80px;
+                background: #EF4444;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 24px;
+                animation: shake 0.6s ease-in-out 0.3s both;
+            }}
+            
+            @keyframes shake {{
+                0%, 100% {{ transform: translateX(0); }}
+                25% {{ transform: translateX(-4px); }}
+                75% {{ transform: translateX(4px); }}
+            }}
+            
+            .x-mark {{
+                width: 32px;
+                height: 32px;
+                color: white;
+            }}
+            
+            .title {{
+                font-size: 28px;
+                font-weight: 700;
+                color: #1F2937;
+                margin-bottom: 12px;
+            }}
+            
+            .subtitle {{
+                font-size: 16px;
+                color: #6B7280;
+                margin-bottom: 32px;
+                line-height: 1.5;
+            }}
+            
+            .tool-info {{
+                background: #FEF2F2;
+                border: 1px solid #FECACA;
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 32px;
+            }}
+            
+            .tool-name {{
+                font-size: 18px;
+                font-weight: 600;
+                color: #374151;
+                margin-bottom: 8px;
+            }}
+            
+            .tool-status {{
+                font-size: 14px;
+                color: #DC2626;
+                font-weight: 500;
+                margin-bottom: 12px;
+            }}
+            
+            .error-details {{
+                font-size: 12px;
+                color: #7F1D1D;
+                background: #FEE2E2;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-family: monospace;
+                word-break: break-word;
+            }}
+            
+            .action-buttons {{
+                display: flex;
+                gap: 12px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }}
+            
+            .retry-button {{
+                background: #059669;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                text-decoration: none;
+                display: inline-block;
+            }}
+            
+            .retry-button:hover {{
+                background: #047857;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
+            }}
+            
+            .close-button {{
+                background: #6B7280;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }}
+            
+            .close-button:hover {{
+                background: #4B5563;
+                transform: translateY(-2px);
+            }}
+            
+            .footer {{
+                margin-top: 24px;
+                font-size: 12px;
+                color: #9CA3AF;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="error-icon">
+                <svg class="x-mark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </div>
+            
+            <h1 class="title">Authentication Failed</h1>
+            <p class="subtitle">
+                We couldn't connect your {display_name} account to ModuleX.
+                Please try again or contact support if the problem persists.
+            </p>
+            
+            <div class="tool-info">
+                <div class="tool-name">{display_name}</div>
+                <div class="tool-status">✗ Connection Failed</div>
+                <div class="error-details">{error_message}</div>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="javascript:history.back()" class="retry-button">Try Again</a>
+                <button class="close-button" onclick="window.close()">Close Window</button>
+            </div>
+            
+            <div class="footer">
+                Powered by ModuleX • Authentication System
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 
 class ManualAuthRequest(BaseModel):
@@ -86,26 +488,26 @@ async def register_manual_auth(
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
-@callback_router.get("/callback/{tool_name}")
+@callback_router.get("/callback/{tool_name}", response_class=HTMLResponse)
 async def auth_callback(
     tool_name: str,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db)
 ):
-    """Handle OAuth callback - No API key required"""
+    """Handle OAuth callback - Returns beautiful HTML page"""
     auth_service = AuthService(db)
     
     try:
         success = await auth_service.handle_callback(tool_name, code, state)
         if success:
-            return {"success": True, "message": f"Successfully authenticated with {tool_name}"}
+            return HTMLResponse(content=get_success_html(tool_name), status_code=200)
         else:
-            raise HTTPException(status_code=400, detail="Authentication failed")
+            return HTMLResponse(content=get_error_html(tool_name, "Authentication process failed"), status_code=400)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
 
 
 @router.get("/tools")
