@@ -374,6 +374,28 @@ class AuthService:
         
         return True
 
+    async def disconnect_tool(self, user_id: str, tool_name: str) -> bool:
+        """Disconnect user from a tool by deleting the auth record"""
+        user = await self.get_or_create_user(user_id)
+        
+        result = await self.db.execute(
+            select(UserToolAuth).where(
+                UserToolAuth.user_id == user.id,
+                UserToolAuth.tool_name == tool_name
+            )
+        )
+        auth_record = result.scalar_one_or_none()
+        
+        if not auth_record:
+            return False
+        
+        # Delete the auth record completely
+        await self.db.delete(auth_record)
+        await self.db.commit()
+        
+        print(f"🔌 DEBUG: Disconnected user_id={user_id} from tool_name={tool_name}")
+        return True
+
     async def cleanup_expired_states(self):
         """Clean up expired OAuth states (Redis TTL handles this automatically)"""
         # Redis TTL automatically cleans up expired keys

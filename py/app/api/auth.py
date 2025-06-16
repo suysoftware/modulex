@@ -191,4 +191,34 @@ async def set_action_disabled_status(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating action status: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error updating action status: {str(e)}")
+
+
+@router.delete("/users/{user_id}/tools/{tool_name}")
+async def disconnect_tool(
+    user_id: str = Path(..., description="User ID"),
+    tool_name: str = Path(..., description="Tool name"),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_api_key)
+):
+    """Disconnect user from a tool by deleting the authentication record"""
+    auth_service = AuthService(db)
+    
+    try:
+        success = await auth_service.disconnect_tool(user_id, tool_name)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Tool {tool_name} not found for user {user_id}"
+            )
+        
+        return {
+            "success": True,
+            "message": f"Successfully disconnected from {tool_name}",
+            "user_id": user_id,
+            "tool_name": tool_name
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error disconnecting from tool: {str(e)}") 

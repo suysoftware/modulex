@@ -5,16 +5,16 @@ ModuleX is a simple tool authentication and execution server that supports OAuth
 
 **Base URL:** `http://localhost:8000`  
 **Version:** `0.1.2`  
-**Total Endpoints:** `13`
+**Total Endpoints:** `14`
 
 ## Endpoint Summary
 
 | Category | Count | Description |
 |----------|--------|-------------|
 | **Main App** | 2 | Root and health check endpoints |
-| **Authentication** | 7 | OAuth flows, manual auth, tool and action management |
+| **Authentication** | 8 | OAuth flows, manual auth, tool and action management |
 | **Tools** | 4 | Tool listing, execution, and OpenAI integration |
-| **Total** | **13** | All available endpoints |
+| **Total** | **14** | All available endpoints |
 
 ---
 
@@ -297,6 +297,31 @@ GET /auth/tools?user_id=user123&detail=true
 }
 ```
 
+### 7. Disconnect from Tool
+- **Method:** `DELETE`
+- **Path:** `/auth/users/{user_id}/tools/{tool_name}`
+- **Description:** Disconnect user from a tool by deleting the authentication record
+- **Authentication:** User ownership required
+
+**Path Parameters:**
+- `user_id` (string): User identifier  
+- `tool_name` (string): Tool name to disconnect from
+
+**Request Example:**
+```bash
+DELETE /auth/users/user123/tools/github
+```
+
+**Response Example:**
+```json
+{
+  "success": true,
+  "message": "Successfully disconnected from github",
+  "user_id": "user123",
+  "tool_name": "github"
+}
+```
+
 ---
 
 ## 🛠️ Tools Endpoints
@@ -528,6 +553,9 @@ PUT /auth/users/user123/tools/github/actions/create_repository/status
 # 9. Deactivate entire tool
 PUT /auth/users/user123/tools/github/status
 {"is_active": false}
+
+# 10. Completely disconnect from tool (deletes all auth data)
+DELETE /auth/users/user123/tools/github
 ```
 
 ### Manual Authentication Flow
