@@ -338,6 +338,8 @@ class AuthService:
 
     async def set_action_disabled_status(self, user_id: str, tool_name: str, action_name: str, is_disabled: bool) -> bool:
         """Enable or disable a specific action for a user's tool"""
+        from sqlalchemy.orm.attributes import flag_modified
+        
         user = await self.get_or_create_user(user_id)
         
         result = await self.db.execute(
@@ -352,8 +354,8 @@ class AuthService:
         if not auth_record:
             return False
         
-        # Initialize disabled_actions if None
-        disabled_actions = auth_record.disabled_actions or []
+        # Initialize disabled_actions if None - create a new list to avoid mutation issues
+        disabled_actions = list(auth_record.disabled_actions or [])
         
         if is_disabled:
             # Add action to disabled list if not already there
@@ -364,7 +366,9 @@ class AuthService:
             if action_name in disabled_actions:
                 disabled_actions.remove(action_name)
         
+        # Assign the new list and explicitly mark as modified
         auth_record.disabled_actions = disabled_actions
+        flag_modified(auth_record, 'disabled_actions')
         auth_record.updated_at = datetime.utcnow()
         await self.db.commit()
         
