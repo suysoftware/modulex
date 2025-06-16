@@ -43,6 +43,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router)
+app.include_router(auth.callback_router)  # Callback endpoints without API key
 app.include_router(tools.router)
 app.include_router(system.router)
 

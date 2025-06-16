@@ -12,6 +12,9 @@ from ..core.config import verify_api_key
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+# Separate router for callback endpoints (no API key required)
+callback_router = APIRouter(prefix="/auth", tags=["Authentication"])
+
 
 class ManualAuthRequest(BaseModel):
     """Manual authentication request for any tool"""
@@ -83,15 +86,14 @@ async def register_manual_auth(
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
-@router.get("/callback/{tool_name}")
+@callback_router.get("/callback/{tool_name}")
 async def auth_callback(
     tool_name: str,
     code: str = Query(...),
     state: str = Query(...),
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    db: AsyncSession = Depends(get_db)
 ):
-    """Handle OAuth callback"""
+    """Handle OAuth callback - No API key required"""
     auth_service = AuthService(db)
     
     try:
