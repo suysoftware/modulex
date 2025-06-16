@@ -154,7 +154,7 @@ jobs:
         echo '```' >> release_notes.md
         echo "" >> release_notes.md
         echo "### 📖 Documentation" >> release_notes.md
-        echo "- [GitHub Repository](https://github.com/suysoftware/modulex)" >> release_notes.md
+        echo "- [GitHub Repository](https://github.com/ModuleXAI/modulex)" >> release_notes.md
         echo "- [API Documentation](http://localhost:8000/docs)" >> release_notes.md
     
     - name: Create GitHub Release

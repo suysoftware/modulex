@@ -103,3 +103,5 @@ pip-wheel-metadata/
 .black/
 .isort.cfg
 .ruff_cache/
+*SECURITY_DEV.md
+*SETUP_DEV.md

@@ -8,7 +8,7 @@ ModuleX is a powerful, production-ready platform for managing Model Context Prot
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com/)
-[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-suysoftware%2Fmodulex-blue.svg)](https://hub.docker.com/r/suysoftware/modulex)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-suysoftware%2Fmodulex-blue.svg)](https://hub.docker.com/r/modulex/modulex)
 
 ## ✨ Features
 
@@ -51,7 +51,7 @@ docker run -d \
   -e DATABASE_URL="sqlite:///app/data/modulex.db" \
   -e REDIS_URL="redis://redis:6379" \
   -v modulex_data:/app/data \
-  suysoftware/modulex:latest
+  modulex/modulex:latest
 ```
 
 2. **Or with docker-compose (recommended)**
@@ -59,7 +59,7 @@ docker run -d \
 version: '3.8'
 services:
   modulex:
-    image: suysoftware/modulex:latest
+    image: modulex/modulex:latest
     ports:
       - "8000:8000"
     environment:
@@ -95,9 +95,9 @@ volumes:
 
 ### 🏷️ Available Docker Tags
 
-- `suysoftware/modulex:latest` - Latest stable release
-- `suysoftware/modulex:dev` - Development version
-- `suysoftware/modulex:v0.1.0` - Specific version tags
+- `modulex/modulex:latest` - Latest stable release
+- `modulex/modulex:dev` - Development version
+- `modulex/modulex:v0.1.0` - Specific version tags
 
 ### Prerequisites
 - Docker
@@ -108,7 +108,7 @@ volumes:
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/suysoftware/modulex.git
+git clone https://github.com/ModuleXAI/modulex.git
 cd modulex
 ```
 
@@ -329,9 +329,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-- 📖 **Documentation**: [modulex.readthedocs.io](https://modulex.readthedocs.io/)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/suysoftware/modulex/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/suysoftware/modulex/discussions)
+- 📖 **Documentation**: [modulex.readthedocs.io](https://docs.modulex.dev/)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/ModuleXAI/modulex/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/ModuleXAI/modulex/discussions)
 
 ## 🙏 Acknowledgments
 
