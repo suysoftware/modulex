@@ -61,7 +61,7 @@ def bid_on_active_auction(parameters: Dict[str, Any]) -> Dict[str, Any]:
     try:
         headers = get_auth_headers()
         
-        product_id = parameters.get("productId")
+        product_id = parameters.get("productId", 0)
         if not product_id:
             return {
                 "success": False,

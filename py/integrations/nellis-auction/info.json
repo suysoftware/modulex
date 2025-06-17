@@ -17,7 +17,7 @@
         "description": "Bid on the active auction",
         "parameters": {
           "productId": {
-            "type": "string",
+            "type": "integer",
             "description": "Target product ID",
             "required": true
           },
