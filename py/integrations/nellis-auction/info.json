@@ -11,6 +11,23 @@
         "name": "list_active_auctions",
         "description": "List active auctions",
         "parameters": {}
+      },
+      {
+        "name": "bid_on_active_auction",
+        "description": "Bid on the active auction",
+        "parameters": {
+          "productId": {
+            "type": "string",
+            "description": "Target product ID",
+            "required": true
+          },
+          "bid": {
+            "type": "integer",
+            "description": "Bid amount",
+            "optional": true
+          }
+        }
       }
+
     ]
   } 

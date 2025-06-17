@@ -56,6 +56,38 @@ def list_active_auctions(parameters: Dict[str, Any]) -> Dict[str, Any]:
         "total": len(auctions)
     }
 
+def bid_on_active_auction(parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Bid on the active auction"""
+    headers = get_auth_headers()
+    
+    product_id = parameters.get("productId")
+    if not product_id:
+        raise ValueError("Product ID is required")
+    
+    data = {
+        "bid": parameters.get("bid", 0),
+        "productId": product_id
+    }
+    
+    response = requests.post(
+        "https://www.nellisauction.com/api/bids",
+        headers=headers,
+        json=data
+    )
+    response.raise_for_status()
+    
+    repo = response.json()
+    return {
+        "message": repo.get("message", ""),
+        "bid_count": repo.get("data", {}).get("bidCount"),
+        "current_amount": repo.get("data", {}).get("currentAmount"),
+        "minimum_next_bid": repo.get("data", {}).get("minimumNextBid"),
+        "winning_bid_user_id": repo.get("data", {}).get("winningBidUserId"),
+        "bidder_count": repo.get("data", {}).get("bidderCount"),
+        "projected_new_close_time": repo.get("data", {}).get("projectNewCloseTime", {}).get("value") if repo.get("data", {}).get("projectNewCloseTime") else None,
+        "project_extended": repo.get("data", {}).get("projectExtended")
+    }
+
 def main():
     """Main execution function"""
     try:
