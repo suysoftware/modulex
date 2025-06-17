@@ -58,88 +58,216 @@ def list_active_auctions(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
 def bid_on_active_auction(parameters: Dict[str, Any]) -> Dict[str, Any]:
     """Bid on the active auction"""
-    print(f"[DEBUG] bid_on_active_auction called with parameters: {parameters}", file=sys.stderr)
-    
     try:
         headers = get_auth_headers()
-        print(f"[DEBUG] Headers obtained successfully", file=sys.stderr)
         
         product_id = parameters.get("productId")
         if not product_id:
-            print(f"[ERROR] Product ID is missing from parameters", file=sys.stderr)
-            raise ValueError("Product ID is required")
+            return {
+                "success": False,
+                "error": "Product ID is required",
+                "error_code": "MISSING_PRODUCT_ID",
+                "user_message": "Ürün ID'si eksik. Lütfen tekrar deneyin."
+            }
         
-        print(f"[DEBUG] Product ID: {product_id}", file=sys.stderr)
+        bid_amount = parameters.get("bid", 0)
+        if bid_amount <= 0:
+            return {
+                "success": False,
+                "error": "Invalid bid amount",
+                "error_code": "INVALID_BID_AMOUNT",
+                "user_message": "Geçerli bir teklif miktarı giriniz."
+            }
         
         data = {
-            "bid": parameters.get("bid", 0),
+            "bid": bid_amount,
             "productId": product_id
         }
         
-        print(f"[DEBUG] Request data: {json.dumps(data)}", file=sys.stderr)
-        print(f"[DEBUG] Request headers: {json.dumps({k: v for k, v in headers.items() if k != 'Cookie'})}", file=sys.stderr)
-        
-        url = "https://www.nellisauction.com/api/bids"
-        print(f"[DEBUG] Making POST request to: {url}", file=sys.stderr)
-        
         response = requests.post(
-            url,
+            "https://www.nellisauction.com/api/bids",
             headers=headers,
-            json=data
+            json=data,
+            timeout=30
         )
         
-        print(f"[DEBUG] Response status code: {response.status_code}", file=sys.stderr)
-        print(f"[DEBUG] Response headers: {dict(response.headers)}", file=sys.stderr)
-        
-        # Response content'i log et
-        response_text = response.text
-        print(f"[DEBUG] Response content: {response_text}", file=sys.stderr)
-        
-        # Status code kontrolü
-        if not response.ok:
-            print(f"[ERROR] HTTP Error {response.status_code}: {response_text}", file=sys.stderr)
-            return {
-                "error": f"HTTP {response.status_code}: {response_text}",
-                "status_code": response.status_code,
-                "response_content": response_text
-            }
-        
+        response_data = None
         try:
-            repo = response.json()
-            print(f"[DEBUG] Successfully parsed JSON response: {json.dumps(repo)}", file=sys.stderr)
-        except json.JSONDecodeError as e:
-            print(f"[ERROR] Failed to parse JSON response: {e}", file=sys.stderr)
+            response_data = response.json()
+        except json.JSONDecodeError:
+            pass
+        
+        # Detailed error handling based on status codes
+        if response.status_code == 400:
+            error_msg = "Geçersiz teklif verisi"
+            if response_data and "message" in response_data:
+                error_msg = response_data["message"]
             return {
-                "error": f"Invalid JSON response: {response_text}",
-                "json_error": str(e)
+                "success": False,
+                "error": "Bad Request - Invalid bid data",
+                "error_code": "INVALID_BID_DATA",
+                "user_message": f"Teklif verirken hata oluştu: {error_msg}",
+                "status_code": 400,
+                "api_response": response_data
             }
         
-        result = {
-            "message": repo.get("message", ""),
-            "bid_count": repo.get("data", {}).get("bidCount"),
-            "current_amount": repo.get("data", {}).get("currentAmount"),
-            "minimum_next_bid": repo.get("data", {}).get("minimumNextBid"),
-            "winning_bid_user_id": repo.get("data", {}).get("winningBidUserId"),
-            "bidder_count": repo.get("data", {}).get("bidderCount"),
-            "projected_new_close_time": repo.get("data", {}).get("projectNewCloseTime", {}).get("value") if repo.get("data", {}).get("projectNewCloseTime") else None,
-            "project_extended": repo.get("data", {}).get("projectExtended")
+        elif response.status_code == 401:
+            return {
+                "success": False,
+                "error": "Unauthorized - Invalid or expired session",
+                "error_code": "AUTH_FAILED",
+                "user_message": "Oturum süresi dolmuş veya geçersiz. Lütfen tekrar giriş yapın.",
+                "status_code": 401
+            }
+        
+        elif response.status_code == 403:
+            return {
+                "success": False,
+                "error": "Forbidden - Not allowed to bid on this auction",
+                "error_code": "BID_FORBIDDEN",
+                "user_message": "Bu müzayedeye teklif verme yetkiniz yok.",
+                "status_code": 403
+            }
+        
+        elif response.status_code == 404:
+            return {
+                "success": False,
+                "error": "Auction not found",
+                "error_code": "AUCTION_NOT_FOUND",
+                "user_message": "Müzayede bulunamadı. Müzayede sona ermiş olabilir.",
+                "status_code": 404
+            }
+        
+        elif response.status_code == 409:
+            error_msg = "Teklif çakışması"
+            if response_data and "message" in response_data:
+                error_msg = response_data["message"]
+            return {
+                "success": False,
+                "error": "Conflict - Bid conflict",
+                "error_code": "BID_CONFLICT",
+                "user_message": f"Teklif çakışması: {error_msg}",
+                "status_code": 409,
+                "api_response": response_data
+            }
+        
+        elif response.status_code == 422:
+            error_msg = "Teklif miktarı geçersiz"
+            if response_data and "message" in response_data:
+                error_msg = response_data["message"]
+            return {
+                "success": False,
+                "error": "Unprocessable Entity - Invalid bid amount",
+                "error_code": "INVALID_BID_AMOUNT",
+                "user_message": f"Geçersiz teklif miktarı: {error_msg}",
+                "status_code": 422,
+                "api_response": response_data
+            }
+        
+        elif response.status_code == 429:
+            return {
+                "success": False,
+                "error": "Too Many Requests - Rate limit exceeded",
+                "error_code": "RATE_LIMIT",
+                "user_message": "Çok fazla istek gönderildi. Lütfen bir süre bekleyip tekrar deneyin.",
+                "status_code": 429
+            }
+        
+        elif response.status_code >= 500:
+            return {
+                "success": False,
+                "error": "Server Error - Nellis Auction server issue",
+                "error_code": "SERVER_ERROR",
+                "user_message": "Nellis Auction sunucusunda bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+                "status_code": response.status_code,
+                "server_response": response.text[:200]  # İlk 200 karakter
+            }
+        
+        elif not response.ok:
+            return {
+                "success": False,
+                "error": f"HTTP {response.status_code} - Unknown error",
+                "error_code": "UNKNOWN_HTTP_ERROR",
+                "user_message": f"Bilinmeyen bir hata oluştu (HTTP {response.status_code}). Lütfen tekrar deneyin.",
+                "status_code": response.status_code,
+                "response_content": response.text[:200]
+            }
+        
+        # Success case
+        if not response_data:
+            return {
+                "success": False,
+                "error": "Invalid response format",
+                "error_code": "INVALID_RESPONSE",
+                "user_message": "Sunucudan geçersiz yanıt alındı.",
+                "response_content": response.text[:200]
+            }
+        
+        # Check if bid was successful
+        if response_data.get("success") is False or "error" in response_data:
+            error_msg = response_data.get("message", "Bilinmeyen hata")
+            return {
+                "success": False,
+                "error": "Bid rejected by server",
+                "error_code": "BID_REJECTED",
+                "user_message": f"Teklif reddedildi: {error_msg}",
+                "api_response": response_data
+            }
+        
+        return {
+            "success": True,
+            "message": response_data.get("message", "Teklif başarıyla verildi"),
+            "bid_count": response_data.get("data", {}).get("bidCount"),
+            "current_amount": response_data.get("data", {}).get("currentAmount"),
+            "minimum_next_bid": response_data.get("data", {}).get("minimumNextBid"),
+            "winning_bid_user_id": response_data.get("data", {}).get("winningBidUserId"),
+            "bidder_count": response_data.get("data", {}).get("bidderCount"),
+            "projected_new_close_time": response_data.get("data", {}).get("projectNewCloseTime", {}).get("value") if response_data.get("data", {}).get("projectNewCloseTime") else None,
+            "project_extended": response_data.get("data", {}).get("projectExtended"),
+            "user_message": "Teklifiniz başarıyla verildi!"
         }
         
-        print(f"[DEBUG] Final result: {json.dumps(result)}", file=sys.stderr)
-        return result
-        
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Request exception: {e}", file=sys.stderr)
+    except requests.exceptions.Timeout:
         return {
+            "success": False,
+            "error": "Request timeout",
+            "error_code": "TIMEOUT",
+            "user_message": "İstek zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin."
+        }
+    except requests.exceptions.ConnectionError:
+        return {
+            "success": False,
+            "error": "Connection failed",
+            "error_code": "CONNECTION_ERROR",
+            "user_message": "Nellis Auction'a bağlanılamadı. Lütfen internet bağlantınızı kontrol edin."
+        }
+    except requests.exceptions.RequestException as e:
+        return {
+            "success": False,
             "error": f"Request failed: {str(e)}",
-            "exception_type": "RequestException"
+            "error_code": "REQUEST_FAILED",
+            "user_message": "İstek sırasında bir hata oluştu. Lütfen tekrar deneyin."
+        }
+    except ValueError as e:
+        if "ACCESS_TOKEN" in str(e):
+            return {
+                "success": False,
+                "error": "Authentication token missing",
+                "error_code": "AUTH_TOKEN_MISSING",
+                "user_message": "Kimlik doğrulama tokeni eksik. Lütfen giriş yapın."
+            }
+        return {
+            "success": False,
+            "error": str(e),
+            "error_code": "VALUE_ERROR",
+            "user_message": "Geçersiz veri. Lütfen girdiğiniz bilgileri kontrol edin."
         }
     except Exception as e:
-        print(f"[ERROR] Unexpected exception: {e}", file=sys.stderr)
-        print(f"[ERROR] Exception type: {type(e).__name__}", file=sys.stderr)
         return {
+            "success": False,
             "error": str(e),
-            "exception_type": type(e).__name__
+            "error_code": "UNEXPECTED_ERROR",
+            "user_message": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin."
         }
 
 def main():
