@@ -58,35 +58,89 @@ def list_active_auctions(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
 def bid_on_active_auction(parameters: Dict[str, Any]) -> Dict[str, Any]:
     """Bid on the active auction"""
-    headers = get_auth_headers()
+    print(f"[DEBUG] bid_on_active_auction called with parameters: {parameters}", file=sys.stderr)
     
-    product_id = parameters.get("productId")
-    if not product_id:
-        raise ValueError("Product ID is required")
-    
-    data = {
-        "bid": parameters.get("bid", 0),
-        "productId": product_id
-    }
-    
-    response = requests.post(
-        "https://www.nellisauction.com/api/bids",
-        headers=headers,
-        json=data
-    )
-    response.raise_for_status()
-    
-    repo = response.json()
-    return {
-        "message": repo.get("message", ""),
-        "bid_count": repo.get("data", {}).get("bidCount"),
-        "current_amount": repo.get("data", {}).get("currentAmount"),
-        "minimum_next_bid": repo.get("data", {}).get("minimumNextBid"),
-        "winning_bid_user_id": repo.get("data", {}).get("winningBidUserId"),
-        "bidder_count": repo.get("data", {}).get("bidderCount"),
-        "projected_new_close_time": repo.get("data", {}).get("projectNewCloseTime", {}).get("value") if repo.get("data", {}).get("projectNewCloseTime") else None,
-        "project_extended": repo.get("data", {}).get("projectExtended")
-    }
+    try:
+        headers = get_auth_headers()
+        print(f"[DEBUG] Headers obtained successfully", file=sys.stderr)
+        
+        product_id = parameters.get("productId")
+        if not product_id:
+            print(f"[ERROR] Product ID is missing from parameters", file=sys.stderr)
+            raise ValueError("Product ID is required")
+        
+        print(f"[DEBUG] Product ID: {product_id}", file=sys.stderr)
+        
+        data = {
+            "bid": parameters.get("bid", 0),
+            "productId": product_id
+        }
+        
+        print(f"[DEBUG] Request data: {json.dumps(data)}", file=sys.stderr)
+        print(f"[DEBUG] Request headers: {json.dumps({k: v for k, v in headers.items() if k != 'Cookie'})}", file=sys.stderr)
+        
+        url = "https://www.nellisauction.com/api/bids"
+        print(f"[DEBUG] Making POST request to: {url}", file=sys.stderr)
+        
+        response = requests.post(
+            url,
+            headers=headers,
+            json=data
+        )
+        
+        print(f"[DEBUG] Response status code: {response.status_code}", file=sys.stderr)
+        print(f"[DEBUG] Response headers: {dict(response.headers)}", file=sys.stderr)
+        
+        # Response content'i log et
+        response_text = response.text
+        print(f"[DEBUG] Response content: {response_text}", file=sys.stderr)
+        
+        # Status code kontrolü
+        if not response.ok:
+            print(f"[ERROR] HTTP Error {response.status_code}: {response_text}", file=sys.stderr)
+            return {
+                "error": f"HTTP {response.status_code}: {response_text}",
+                "status_code": response.status_code,
+                "response_content": response_text
+            }
+        
+        try:
+            repo = response.json()
+            print(f"[DEBUG] Successfully parsed JSON response: {json.dumps(repo)}", file=sys.stderr)
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Failed to parse JSON response: {e}", file=sys.stderr)
+            return {
+                "error": f"Invalid JSON response: {response_text}",
+                "json_error": str(e)
+            }
+        
+        result = {
+            "message": repo.get("message", ""),
+            "bid_count": repo.get("data", {}).get("bidCount"),
+            "current_amount": repo.get("data", {}).get("currentAmount"),
+            "minimum_next_bid": repo.get("data", {}).get("minimumNextBid"),
+            "winning_bid_user_id": repo.get("data", {}).get("winningBidUserId"),
+            "bidder_count": repo.get("data", {}).get("bidderCount"),
+            "projected_new_close_time": repo.get("data", {}).get("projectNewCloseTime", {}).get("value") if repo.get("data", {}).get("projectNewCloseTime") else None,
+            "project_extended": repo.get("data", {}).get("projectExtended")
+        }
+        
+        print(f"[DEBUG] Final result: {json.dumps(result)}", file=sys.stderr)
+        return result
+        
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Request exception: {e}", file=sys.stderr)
+        return {
+            "error": f"Request failed: {str(e)}",
+            "exception_type": "RequestException"
+        }
+    except Exception as e:
+        print(f"[ERROR] Unexpected exception: {e}", file=sys.stderr)
+        print(f"[ERROR] Exception type: {type(e).__name__}", file=sys.stderr)
+        return {
+            "error": str(e),
+            "exception_type": type(e).__name__
+        }
 
 def main():
     """Main execution function"""
