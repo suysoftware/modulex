@@ -1,0 +1,16 @@
+{
+    "name": "nellis-auction",
+    "display_name": "Nellis Auction",
+    "description": "Nellis Auction",
+    "version": "1.0.0",
+    "author": "ModuleX",
+    "requires_auth": true,
+    "auth_type": "api_key_or_credentials",
+    "actions": [
+      {
+        "name": "list_active_auctions",
+        "description": "List active auctions",
+        "parameters": {}
+      }
+    ]
+  } 
