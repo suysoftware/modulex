@@ -24,7 +24,7 @@
           "bid": {
             "type": "integer",
             "description": "Bid amount",
-            "optional": true
+            "required": true
           }
         }
       }
