@@ -100,6 +100,8 @@ def main():
         # Execute action
         if action == "list_active_auctions":
             result = list_active_auctions(parameters)
+        elif action == "bid_on_active_auction":
+            result = bid_on_active_auction(parameters)
         else:
             raise ValueError(f"Unknown action: {action}")
         
