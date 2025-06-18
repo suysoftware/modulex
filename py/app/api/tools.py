@@ -89,9 +89,9 @@ async def execute_tool(
 
 
 # New endpoints for OpenAI/Vercel AI SDK compatibility
-@router.get("/openai/users/{user_id}/openai-tools")
+@router.get("/openai-tools")
 async def get_user_openai_tools(
-    user_id: str = Path(..., description="User ID"),
+    user_id: str = Query(..., description="User ID"),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_api_key)
 ):

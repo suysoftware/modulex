@@ -189,7 +189,7 @@ curl -X POST "http://localhost:8000/tools/github/execute?user_id=your_user_id" \
 
 1. **Get OpenAI-Compatible Tools**
 ```bash
-curl "http://localhost:8000/tools/openai/users/your_user_id/openai-tools"
+curl "http://localhost:8000/tools/openai-tools?user_id=your_user_id"
 ```
 
 2. **Execute Tool (OpenAI Format)**
@@ -201,15 +201,81 @@ curl -X POST "http://localhost:8000/tools/github/execute?user_id=your_user_id" \
 
 ## 🔧 Configuration
 
+ModuleX supports both environment variables and TOML configuration files for flexible deployment.
+
+### TOML Configuration (Recommended)
+
+ModuleX uses a two-tier configuration system:
+
+1. **Default Configuration**: `py/modulex.toml` (included with the project)
+2. **Custom Configuration**: Your custom file (optional)
+
+#### Using Custom Configuration
+
+```bash
+# Create a custom config file
+cp docker/user_configs/example_config.toml docker/user_configs/my_config.toml
+
+# Edit your custom settings
+nano docker/user_configs/my_config.toml
+
+# Set environment variable to use custom config
+export MODULEX_CONFIG_PATH=/path/to/docker/user_configs/my_config.toml
+
+# Start the application
+python -m app.main
+```
+
+#### Example Custom Configuration
+
+```toml
+[general]
+app_name = "My ModuleX Instance"
+debug = true
+log_level = "DEBUG"
+
+[server]
+port = 8080
+workers = 4
+
+[load_balancing]
+default_config = "azure_e8ds_v5"
+max_concurrent_executions = 100
+request_timeout = 45.0
+
+[features]
+enable_openai_tools = true
+enable_manual_auth = false
+
+[custom]
+environment = "production"
+team = "data-science"
+```
+
+#### Configuration Management API
+
+```bash
+# Get current configuration
+curl "http://localhost:8000/system/config" \
+  -H "Authorization: Bearer your-api-key"
+
+# Reload configuration from files
+curl -X POST "http://localhost:8000/system/config/reload" \
+  -H "Authorization: Bearer your-api-key"
+```
+
 ### Environment Variables
+
+Environment variables override TOML settings when provided:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `MODULEX_CONFIG_PATH` | Path to custom TOML config file | None (uses default) |
 | `DATABASE_URL` | PostgreSQL connection string | Required |
 | `REDIS_URL` | Redis connection string | Required |
-| `DEBUG` | Enable debug mode | `false` |
-| `ALLOWED_HOSTS` | CORS allowed hosts | `*` |
+| `DEBUG` | Enable debug mode | From TOML config |
 | `SECRET_KEY` | JWT secret key | Auto-generated |
+| `MODULEX_API_KEY` | API key for protected endpoints | None (development mode) |
 
 ### Adding New Tools
 

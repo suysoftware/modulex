@@ -42,7 +42,7 @@ ModuleX is a simple tool authentication and execution server that supports OAuth
       "list_tools": "/tools/",
       "get_tool_info": "/tools/{tool_name}",
       "execute_tool": "/tools/{tool_name}/execute?user_id=YOUR_USER_ID",
-      "get_user_openai_tools": "/tools/openai/users/{user_id}/openai-tools"
+      "get_user_openai_tools": "/tools/openai-tools?user_id=YOUR_USER_ID"
     }
   }
 }
@@ -241,13 +241,15 @@ GET /auth/tools?user_id=user123&detail=true
 
 ### 5. Set Tool Active Status
 - **Method:** `PUT`
-- **Path:** `/auth/users/{user_id}/tools/{tool_name}/status`
+- **Path:** `/auth/tools/{tool_name}/status`
 - **Description:** Enable or disable a user's authenticated tool
 - **Authentication:** User ownership required
 
 **Path Parameters:**
-- `user_id` (string): User identifier
 - `tool_name` (string): Tool name to modify
+
+**Query Parameters:**
+- `user_id` (string, required): User identifier
 
 **Request Body:**
 ```json
@@ -269,14 +271,16 @@ GET /auth/tools?user_id=user123&detail=true
 
 ### 6. Set Action Disabled Status
 - **Method:** `PUT`
-- **Path:** `/auth/users/{user_id}/tools/{tool_name}/actions/{action_name}/status`
+- **Path:** `/auth/tools/{tool_name}/actions/{action_name}/status`
 - **Description:** Enable or disable a specific action for a user's tool
 - **Authentication:** User ownership required
 
 **Path Parameters:**
-- `user_id` (string): User identifier
 - `tool_name` (string): Tool name
 - `action_name` (string): Action name to modify
+
+**Query Parameters:**
+- `user_id` (string, required): User identifier
 
 **Request Body:**
 ```json
@@ -299,17 +303,19 @@ GET /auth/tools?user_id=user123&detail=true
 
 ### 7. Disconnect from Tool
 - **Method:** `DELETE`
-- **Path:** `/auth/users/{user_id}/tools/{tool_name}`
+- **Path:** `/auth/tools/{tool_name}`
 - **Description:** Disconnect user from a tool by deleting the authentication record
 - **Authentication:** User ownership required
 
 **Path Parameters:**
-- `user_id` (string): User identifier  
 - `tool_name` (string): Tool name to disconnect from
+
+**Query Parameters:**
+- `user_id` (string, required): User identifier
 
 **Request Example:**
 ```bash
-DELETE /auth/users/user123/tools/github
+DELETE /auth/tools/github?user_id=user123
 ```
 
 **Response Example:**
@@ -453,20 +459,20 @@ GET /tools/github
 }
 ```
 
-**Note:** Disabled actions are filtered out at the client level through the `/auth/tools` and `/tools/openai/users/{user_id}/openai-tools` endpoints, so execution requests for disabled actions are unlikely to occur.
+**Note:** Disabled actions are filtered out at the client level through the `/auth/tools` and `/tools/openai-tools` endpoints, so execution requests for disabled actions are unlikely to occur.
 
 ### 4. Get OpenAI Tools (Vercel AI SDK)
 - **Method:** `GET`
-- **Path:** `/tools/openai/users/{user_id}/openai-tools`
+- **Path:** `/tools/openai-tools`
 - **Description:** Get user's active tools with enabled actions in OpenAI function format for Vercel AI SDK
 - **Authentication:** User ID required
 
-**Path Parameters:**
-- `user_id` (string): User identifier
+**Query Parameters:**
+- `user_id` (string, required): User identifier
 
 **Request Example:**
 ```bash
-GET /tools/openai/users/user123/openai-tools
+GET /tools/openai-tools?user_id=user123
 ```
 
 **Response Example:**
@@ -537,25 +543,25 @@ GET /auth/tools?user_id=user123
 GET /auth/tools?user_id=user123&detail=true
 
 # 5. Disable a specific action
-PUT /auth/users/user123/tools/github/actions/create_repository/status
+PUT /auth/tools/github/actions/create_repository/status?user_id=user123
 {"is_disabled": true}
 
 # 6. Check tools again to see action status
 GET /auth/tools?user_id=user123
 
 # 7. Check OpenAI tools (disabled actions won't appear)
-GET /tools/openai/users/user123/openai-tools
+GET /tools/openai-tools?user_id=user123
 
 # 8. Re-enable the action
-PUT /auth/users/user123/tools/github/actions/create_repository/status
+PUT /auth/tools/github/actions/create_repository/status?user_id=user123
 {"is_disabled": false}
 
 # 9. Deactivate entire tool
-PUT /auth/users/user123/tools/github/status
+PUT /auth/tools/github/status?user_id=user123
 {"is_active": false}
 
 # 10. Completely disconnect from tool (deletes all auth data)
-DELETE /auth/users/user123/tools/github
+DELETE /auth/tools/github?user_id=user123
 ```
 
 ### Manual Authentication Flow
@@ -582,7 +588,7 @@ POST /tools/custom_api/execute?user_id=user123
 }
 
 # 4. Disable specific actions if needed
-PUT /auth/users/user123/tools/custom_api/actions/delete_data/status
+PUT /auth/tools/custom_api/actions/delete_data/status?user_id=user123
 {"is_disabled": true}
 ```
 
@@ -628,7 +634,7 @@ PUT /auth/users/user123/tools/custom_api/actions/delete_data/status
 ### For Vercel AI SDK
 ```javascript
 // Get user's active tools with enabled actions
-const response = await fetch(`/tools/openai/users/${userId}/openai-tools`);
+const response = await fetch(`/tools/openai-tools?user_id=${userId}`);
 const tools = await response.json();
 
 // Use tools in Vercel AI SDK (only enabled actions will be available)

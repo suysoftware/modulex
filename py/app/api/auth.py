@@ -530,10 +530,10 @@ async def get_user_tools(
         raise HTTPException(status_code=500, detail=f"Error retrieving tools: {str(e)}")
 
 
-@router.put("/users/{user_id}/tools/{tool_name}/status")
+@router.put("/tools/{tool_name}/status")
 async def set_tool_active_status(
-    user_id: str = Path(..., description="User ID"),
     tool_name: str = Path(..., description="Tool name"),
+    user_id: str = Query(..., description="User ID"),
     request: ToolActiveStatusRequest = ...,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_api_key)
@@ -562,11 +562,11 @@ async def set_tool_active_status(
         raise HTTPException(status_code=500, detail=f"Error updating tool status: {str(e)}")
 
 
-@router.put("/users/{user_id}/tools/{tool_name}/actions/{action_name}/status")
+@router.put("/tools/{tool_name}/actions/{action_name}/status")
 async def set_action_disabled_status(
-    user_id: str = Path(..., description="User ID"),
     tool_name: str = Path(..., description="Tool name"),
     action_name: str = Path(..., description="Action name"),
+    user_id: str = Query(..., description="User ID"),
     request: ActionDisabledStatusRequest = ...,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_api_key)
@@ -598,10 +598,10 @@ async def set_action_disabled_status(
         raise HTTPException(status_code=500, detail=f"Error updating action status: {str(e)}")
 
 
-@router.delete("/users/{user_id}/tools/{tool_name}")
+@router.delete("/tools/{tool_name}")
 async def disconnect_tool(
-    user_id: str = Path(..., description="User ID"),
     tool_name: str = Path(..., description="Tool name"),
+    user_id: str = Query(..., description="User ID"),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_api_key)
 ):

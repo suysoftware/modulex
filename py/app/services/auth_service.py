@@ -40,7 +40,7 @@ class AuthService:
             "scopes": ["chat:write", "channels:read"],
             "client_id": settings.SLACK_CLIENT_ID,
             "client_secret": settings.SLACK_CLIENT_SECRET,
-        }
+        },
     }
     
     def __init__(self, db: AsyncSession):

@@ -60,16 +60,21 @@ async def root():
             "auth": {
                 "get_auth_url": "/auth/url/{tool_name}?user_id=YOUR_USER_ID",
                 "callback": "/auth/callback/{tool_name}",
-                "list_user_tools": "/auth/tools?user_id=YOUR_USER_ID"
+                "list_user_tools": "/auth/tools?user_id=YOUR_USER_ID",
+                "set_tool_status": "/auth/tools/{tool_name}/status?user_id=YOUR_USER_ID",
+                "set_action_status": "/auth/tools/{tool_name}/actions/{action_name}/status?user_id=YOUR_USER_ID",
+                "disconnect_tool": "/auth/tools/{tool_name}?user_id=YOUR_USER_ID"
             },
             "tools": {
                 "list_tools": "/tools/",
                 "get_tool_info": "/tools/{tool_name}",
                 "execute_tool": "/tools/{tool_name}/execute?user_id=YOUR_USER_ID",
-                "get_user_openai_tools": "/tools/openai/users/{user_id}/openai-tools"
+                "get_user_openai_tools": "/tools/openai-tools?user_id=YOUR_USER_ID"
             },
             "system": {
                 "health": "/system/health",
+                "config": "/system/config",
+                "config_reload": "/system/config/reload",
                 "database_update": "/system/database/update",
                 "database_rollback": "/system/database/rollback"
             }
