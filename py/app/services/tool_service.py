@@ -243,3 +243,11 @@ class ToolService:
                     })
         
         return tools
+    
+    async def get_all_tools(self) -> list:
+        """Alias for list_available_tools for compatibility"""
+        return await self.list_available_tools()
+    
+    async def execute_tool_action(self, user_id: str, tool_name: str, action_name: str, parameters: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Execute a tool action for a user - alias for execute_tool"""
+        return await self.execute_tool(user_id, tool_name, action_name, parameters)
