@@ -1,52 +1,34 @@
 """
-Tool API Endpoints
+Tools API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any, Optional, List
-from pydantic import BaseModel
+from typing import Optional
 
 from ..core.database import get_db
 from ..services.tool_service import ToolService
 from ..services.auth_service import AuthService
-from ..core.config import verify_api_key
+from ..core.auth import auth_required, AuthResult
 
 router = APIRouter(prefix="/tools", tags=["Tools"])
 
 
-class ToolExecutionRequest(BaseModel):
-    action: Optional[str] = None
-    parameters: Optional[Dict[str, Any]] = None
-
-
-class OpenAIToolExecutionRequest(BaseModel):
-    """Request model for direct tool execution (OpenAI/Vercel AI SDK format)"""
-    parameters: Optional[Dict[str, Any]] = None
-
-
 @router.get("/")
-async def list_tools(db: AsyncSession = Depends(get_db), _: bool = Depends(verify_api_key)):
-    """List all available tools"""
+async def list_tools(db: AsyncSession = Depends(get_db)):
+    """List all available tools - No auth required"""
     tool_service = ToolService(db)
-    
-    try:
-        tools = await tool_service.list_available_tools()
-        return {
-            "tools": tools,
-            "total": len(tools)
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing tools: {str(e)}")
+    tools = await tool_service.get_all_tools()
+    return {"tools": tools}
 
 
 @router.get("/{tool_name}")
-async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db), _: bool = Depends(verify_api_key)):
-    """Get information about a specific tool"""
+async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db)):
+    """Get information about a specific tool - No auth required"""
     tool_service = ToolService(db)
-    
     tool_info = await tool_service.get_tool_info(tool_name)
+    
     if not tool_info:
-        raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
+        raise HTTPException(status_code=404, detail="Tool not found")
     
     return tool_info
 
@@ -55,58 +37,56 @@ async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db), _: b
 async def execute_tool(
     tool_name: str,
     request: ToolExecutionRequest,
-    user_id: str = Query(..., description="User ID"),
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    user: AuthResult = Depends(auth_required(endpoint_requires_user_id=True)),
+    user_id: str = Query(None),
+    db: AsyncSession = Depends(get_db)
 ):
-    """Execute a tool action (supports both legacy and new formats)"""
+    """Execute a tool action - Auth required with user_id"""
+    
+    # Get effective user_id based on auth method
+    effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    
     tool_service = ToolService(db)
     
     try:
-        # Handle different request formats
-        if hasattr(request, 'action') and request.action:
-            # Legacy format: action is directly in the request
-            action = request.action
-            parameters = request.parameters or {}
-        elif hasattr(request, 'parameters') and request.parameters and 'action' in request.parameters:
-            # New format: action is inside parameters
-            parameters = request.parameters.copy()
-            action = parameters.pop('action')
-        else:
-            raise ValueError("Missing action parameter")
-        
-        result = await tool_service.execute_tool(
-            user_id=user_id,
+        result = await tool_service.execute_tool_action(
+            user_id=effective_user_id,
             tool_name=tool_name,
-            action=action,
-            parameters=parameters
+            action_name=request.action,
+            parameters=request.parameters or {}
         )
         return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tool execution error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Tool execution failed: {str(e)}")
 
 
-# New endpoints for OpenAI/Vercel AI SDK compatibility
 @router.get("/openai-tools")
 async def get_user_openai_tools(
-    user_id: str = Query(..., description="User ID"),
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    user: AuthResult = Depends(auth_required(endpoint_requires_user_id=True)),
+    user_id: str = Query(None),
+    db: AsyncSession = Depends(get_db)
 ):
-    """Get user's authenticated and active tools in OpenAI tools format for Vercel AI SDK"""
+    """Get user's authenticated and active tools in OpenAI tools format"""
+    
+    # Get effective user_id based on auth method
+    effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    
     auth_service = AuthService(db)
     tool_service = ToolService(db)
     
     try:
         # Get user's authenticated and active tools only
-        user_tools = await auth_service.get_user_active_tools(user_id)
+        user_tools = await auth_service.get_user_active_tools(effective_user_id)
         
         if not user_tools:
-            # Log for debugging but return empty list (not an error)
             import logging
-            logging.info(f"No active tools found for user_id={user_id}")
+            logging.info(f"No active tools found for user_id={effective_user_id}")
         
         openai_tools = []
         
@@ -157,5 +137,15 @@ async def get_user_openai_tools(
         
     except Exception as e:
         import logging
-        logging.error(f"Error retrieving OpenAI tools for user {user_id}: {str(e)}")
+        logging.error(f"Error retrieving OpenAI tools for user {effective_user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving OpenAI tools: {str(e)}")
+
+
+# Need to import ToolExecutionRequest - adding it here for completeness
+from pydantic import BaseModel
+from typing import Dict, Any
+
+class ToolExecutionRequest(BaseModel):
+    """Tool execution request"""
+    action: str
+    parameters: Optional[Dict[str, Any]] = None

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from ..core.database import get_db
 from ..services.auth_service import AuthService
-from ..core.config import verify_api_key
+from ..core.auth import auth_required, AuthResult
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -438,15 +438,18 @@ class ActionDisabledStatusRequest(BaseModel):
 @router.get("/url/{tool_name}")
 async def get_auth_url(
     tool_name: str,
-    user_id: str = Query(..., description="User ID"),
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    user: AuthResult = Depends(auth_required(endpoint_requires_user_id=True)),
+    user_id: str = Query(None),
+    db: AsyncSession = Depends(get_db)
 ):
     """Get OAuth authorization URL for a tool"""
     auth_service = AuthService(db)
     
+    # Get effective user_id based on auth method
+    effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
+    
     try:
-        auth_url, state = await auth_service.generate_auth_url(user_id, tool_name)
+        auth_url, state = await auth_service.generate_auth_url(effective_user_id, tool_name)
         return {
             "auth_url": auth_url,
             "state": state,
