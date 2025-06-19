@@ -13,8 +13,9 @@ from .config import settings
 
 def _generate_key(user_id: uuid.UUID) -> bytes:
     """Generate encryption key from user ID"""
-    # Use user ID + secret key to generate consistent encryption key
-    password = f"{settings.SECRET_KEY}:{str(user_id)}".encode()
+    # Use user ID + encryption key to generate consistent encryption key
+    encryption_key = settings.ENCRYPTION_KEY or settings.SECRET_KEY  # Fallback to SECRET_KEY
+    password = f"{encryption_key}:{str(user_id)}".encode()
     salt = b"salt_1234567890"  # In production, use random salt per user
     
     kdf = PBKDF2HMAC(
@@ -54,8 +55,9 @@ def decrypt_credentials(user_id: uuid.UUID, encrypted_data: str) -> dict:
 
 def _generate_tool_key(tool_name: str) -> bytes:
     """Generate encryption key from tool name"""
-    # Use tool name + secret key to generate consistent encryption key
-    password = f"{settings.SECRET_KEY}:tool:{tool_name}".encode()
+    # Use tool name + encryption key to generate consistent encryption key
+    encryption_key = settings.ENCRYPTION_KEY or settings.SECRET_KEY  # Fallback to SECRET_KEY
+    password = f"{encryption_key}:tool:{tool_name}".encode()
     salt = b"tool_salt_123456"  # Tool-specific salt
     
     kdf = PBKDF2HMAC(

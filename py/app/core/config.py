@@ -14,6 +14,7 @@ class Settings:
     
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")  # Encryption key for sensitive data
     MODULEX_API_KEY: str = os.getenv("MODULEX_API_KEY", "")  # API key for ModuleX endpoints
     
     # Redis
