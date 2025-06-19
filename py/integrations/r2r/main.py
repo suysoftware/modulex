@@ -14,7 +14,6 @@ def get_r2r_credentials(user_credentials: Optional[Dict[str, Any]] = None) -> Di
     if user_credentials and user_credentials.get("auth_type") == "manual":
         # Use user-specific credentials from database
         return {
-            "api_base": user_credentials.get("base_url") or os.getenv("R2R_API_BASE"),
             "base_url": user_credentials.get("base_url") or os.getenv("R2R_BASE_URL"),
             "api_key": None,  # Not used in manual auth
             "email": user_credentials.get("email"),
@@ -22,14 +21,12 @@ def get_r2r_credentials(user_credentials: Optional[Dict[str, Any]] = None) -> Di
         }
     else:
         # Fallback to environment variables (backward compatibility)
-        api_base = os.getenv("R2R_API_BASE")
         base_url = os.getenv("R2R_BASE_URL") 
         api_key = os.getenv("R2R_API_KEY")
         email = os.getenv("R2R_EMAIL")
         password = os.getenv("R2R_PASSWORD")
         
         return {
-            "api_base": api_base,
             "base_url": base_url,
             "api_key": api_key,
             "email": email,

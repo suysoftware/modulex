@@ -6,31 +6,16 @@
     "author": "ModuleX",
     "requires_auth": true,
     "auth_type": "api_key_or_credentials",
-    "environment_variables": [
+    "setup_environment_variables": [
       {
         "name": "R2R_API_BASE",
         "description": "R2R API base URL",
-        "required": true
-      },
-      {
-        "name": "R2R_BASE_URL",
-        "description": "R2R base URL",
-        "required": true
+        "sample_format": "https://r2r.example.com"
       },
       {
         "name": "R2R_API_KEY",
-        "description": "R2R API key (alternative to email/password)",
-        "required": false
-      },
-      {
-        "name": "R2R_EMAIL",
-        "description": "R2R login email",
-        "required": false
-      },
-      {
-        "name": "R2R_PASSWORD",
-        "description": "R2R login password",
-        "required": false
+        "description": "R2R API key",
+        "sample_format": "sk-1234567890"
       }
     ],
     "actions": [

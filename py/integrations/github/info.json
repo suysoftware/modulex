@@ -6,6 +6,18 @@
     "author": "ModuleX",
     "requires_auth": true,
     "auth_type": "oauth2",
+    "setup_environment_variables": [
+      {
+        "name": "GITHUB_CLIENT_ID",
+        "description": "GitHub client ID",
+        "sample_format": "ghp_1234567890"
+      },
+      {
+        "name": "GITHUB_CLIENT_SECRET",
+        "description": "GitHub client secret",
+        "sample_format": "ghs_1234567890"
+      }
+    ],
     "actions": [
       {
         "name": "list_repositories",

@@ -44,4 +44,9 @@ async def get_redis():
 async def create_tables():
     """Create all tables"""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all) 
+        await conn.run_sync(Base.metadata.create_all)
+
+
+async def get_db_session():
+    """Get database session for direct use (not for FastAPI dependency)"""
+    return AsyncSessionLocal() 

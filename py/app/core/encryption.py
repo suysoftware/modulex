@@ -49,4 +49,43 @@ def decrypt_credentials(user_id: uuid.UUID, encrypted_data: str) -> dict:
     decrypted_data = f.decrypt(encrypted_bytes)
     
     # Convert back to dict
-    return json.loads(decrypted_data.decode()) 
+    return json.loads(decrypted_data.decode())
+
+
+def _generate_tool_key(tool_name: str) -> bytes:
+    """Generate encryption key from tool name"""
+    # Use tool name + secret key to generate consistent encryption key
+    password = f"{settings.SECRET_KEY}:tool:{tool_name}".encode()
+    salt = b"tool_salt_123456"  # Tool-specific salt
+    
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password))
+    return key
+
+
+def encrypt_tool_variable(tool_name: str, variable_value: str) -> str:
+    """Encrypt tool environment variable"""
+    key = _generate_tool_key(tool_name)
+    f = Fernet(key)
+    
+    # Encrypt the variable value
+    encrypted_data = f.encrypt(variable_value.encode())
+    
+    return base64.urlsafe_b64encode(encrypted_data).decode()
+
+
+def decrypt_tool_variable(tool_name: str, encrypted_data: str) -> str:
+    """Decrypt tool environment variable"""
+    key = _generate_tool_key(tool_name)
+    f = Fernet(key)
+    
+    # Decode and decrypt
+    encrypted_bytes = base64.urlsafe_b64decode(encrypted_data.encode())
+    decrypted_data = f.decrypt(encrypted_bytes)
+    
+    return decrypted_data.decode() 

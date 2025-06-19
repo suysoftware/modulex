@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from .core.config import settings, verify_api_key, get_api_key_info
 from .core.database import create_tables
-from .api import auth, tools, system
+from .api import auth, tools, system, integrations
 from .api.system import run_migrations_for_startup
 
 
@@ -17,6 +17,26 @@ async def lifespan(app: FastAPI):
     # Startup
     await create_tables()
     await run_migrations_for_startup()  # Run migrations after table creation
+    
+    # Sync integrations on startup
+    try:
+        from .core.database import get_db_session
+        from .services.integration_service import IntegrationService
+        
+        async with get_db_session() as db:
+            integration_service = IntegrationService(db)
+            
+            # Sync available tools from integrations folder
+            synced_count = await integration_service.sync_available_tools()
+            print(f"🔄 Synced {synced_count} available tools")
+            
+            # Auto-install tools from environment
+            installed_count = await integration_service.auto_install_from_env()
+            print(f"🚀 Auto-installed {installed_count} tools from environment")
+            
+    except Exception as e:
+        print(f"⚠️ Warning: Integration sync failed during startup: {str(e)}")
+    
     yield
     # Shutdown
     pass
@@ -46,6 +66,7 @@ app.include_router(auth.router)
 app.include_router(auth.callback_router)  # Callback endpoints without API key
 app.include_router(tools.router)
 app.include_router(system.router)
+app.include_router(integrations.router)
 
 
 @app.get("/")
