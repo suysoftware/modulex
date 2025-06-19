@@ -9,8 +9,7 @@ from pydantic import BaseModel
 
 from ..core.database import get_db
 from ..services.auth_service import AuthService
-from ..core.auth import user_auth_required, AuthResult
-from ..core.config import verify_api_key
+from ..core.auth import user_auth_required, system_auth_required, AuthResult
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -421,7 +420,6 @@ def get_error_html(tool_name: str, error_message: str) -> str:
 
 class ManualAuthRequest(BaseModel):
     """Manual authentication request for any tool"""
-    user_id: str
     tool_name: str
     credentials: Dict[str, Any]  # Flexible credentials structure
 
@@ -463,15 +461,22 @@ async def get_auth_url(
 @router.post("/manual")
 async def register_manual_auth(
     request: ManualAuthRequest,
+    user_id: str = Query(None, description="User ID (required when using X-API-KEY)"),
     db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    user: AuthResult = Depends(user_auth_required)
 ):
     """Register credentials manually for any tool (no OAuth flow needed)"""
     auth_service = AuthService(db)
     
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
+    effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    
     try:
         success = await auth_service.register_manual_auth(
-            user_id=request.user_id,
+            user_id=effective_user_id,
             tool_name=request.tool_name,
             credentials=request.credentials
         )
@@ -480,7 +485,7 @@ async def register_manual_auth(
             return {
                 "success": True,
                 "message": f"Manual credentials successfully registered for {request.tool_name}",
-                "user_id": request.user_id,
+                "user_id": effective_user_id,
                 "tool_name": request.tool_name
             }
         else:
@@ -519,13 +524,19 @@ async def get_user_tools(
     user_id: str = Query(..., description="User ID"),
     detail: bool = Query(False, description="Return detailed tool information"),
     db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    user: AuthResult = Depends(user_auth_required)
 ):
     """Get all available tools with user authentication and active status"""
     auth_service = AuthService(db)
     
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
+    effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    
     try:
-        tools = await auth_service.get_all_tools_with_user_status(user_id, detail)
+        tools = await auth_service.get_all_tools_with_user_status(effective_user_id, detail)
         
         return {
             "tools": tools,
@@ -540,24 +551,30 @@ async def set_tool_active_status(
     user_id: str = Query(..., description="User ID"),
     request: ToolActiveStatusRequest = ...,
     db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    auth_user: AuthResult = Depends(user_auth_required)
 ):
     """Set the active status of a user's authenticated tool"""
     auth_service = AuthService(db)
     
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
+    effective_user_id = user_id if auth_user.auth_method == "x_api_key" else auth_user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    
     try:
-        success = await auth_service.set_tool_active_status(user_id, tool_name, request.is_active)
+        success = await auth_service.set_tool_active_status(effective_user_id, tool_name, request.is_active)
         
         if not success:
             raise HTTPException(
                 status_code=404, 
-                detail=f"Tool {tool_name} not found or not authenticated for user {user_id}"
+                detail=f"Tool {tool_name} not found or not authenticated for user {effective_user_id}"
             )
         
         return {
             "success": True,
             "message": f"Tool {tool_name} {'activated' if request.is_active else 'deactivated'} successfully",
-            "user_id": user_id,
+            "user_id": effective_user_id,
             "tool_name": tool_name,
             "is_active": request.is_active
         }
@@ -573,26 +590,32 @@ async def set_action_disabled_status(
     user_id: str = Query(..., description="User ID"),
     request: ActionDisabledStatusRequest = ...,
     db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    auth_user: AuthResult = Depends(user_auth_required)
 ):
     """Enable or disable a specific action for a user's tool"""
     auth_service = AuthService(db)
     
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
+    effective_user_id = user_id if auth_user.auth_method == "x_api_key" else auth_user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    
     try:
         success = await auth_service.set_action_disabled_status(
-            user_id, tool_name, action_name, request.is_disabled
+            effective_user_id, tool_name, action_name, request.is_disabled
         )
         
         if not success:
             raise HTTPException(
                 status_code=404, 
-                detail=f"Tool {tool_name} not found or not authenticated for user {user_id}"
+                detail=f"Tool {tool_name} not found or not authenticated for user {effective_user_id}"
             )
         
         return {
             "success": True,
             "message": f"Action '{action_name}' for tool '{tool_name}' {'disabled' if request.is_disabled else 'enabled'} successfully",
-            "user_id": user_id,
+            "user_id": effective_user_id,
             "tool_name": tool_name,
             "action_name": action_name,
             "is_disabled": request.is_disabled
@@ -607,24 +630,30 @@ async def disconnect_tool(
     tool_name: str = Path(..., description="Tool name"),
     user_id: str = Query(..., description="User ID"),
     db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_api_key)
+    auth_user: AuthResult = Depends(user_auth_required)
 ):
     """Disconnect user from a tool by deleting the authentication record"""
     auth_service = AuthService(db)
     
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
+    effective_user_id = user_id if auth_user.auth_method == "x_api_key" else auth_user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    
     try:
-        success = await auth_service.disconnect_tool(user_id, tool_name)
+        success = await auth_service.disconnect_tool(effective_user_id, tool_name)
         
         if not success:
             raise HTTPException(
                 status_code=404, 
-                detail=f"Tool {tool_name} not found for user {user_id}"
+                detail=f"Tool {tool_name} not found for user {effective_user_id}"
             )
         
         return {
             "success": True,
             "message": f"Successfully disconnected from {tool_name}",
-            "user_id": user_id,
+            "user_id": effective_user_id,
             "tool_name": tool_name
         }
         
