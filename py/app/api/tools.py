@@ -3,12 +3,19 @@ Tools API Endpoints
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
 
 from ..core.database import get_db
 from ..services.tool_service import ToolService
 from ..services.auth_service import AuthService
 from ..core.auth import auth_required, AuthResult
+
+
+class ToolExecutionRequest(BaseModel):
+    """Tool execution request"""
+    action: str
+    parameters: Optional[Dict[str, Any]] = None
 
 router = APIRouter(prefix="/tools", tags=["Tools"])
 
@@ -141,11 +148,3 @@ async def get_user_openai_tools(
         raise HTTPException(status_code=500, detail=f"Error retrieving OpenAI tools: {str(e)}")
 
 
-# Need to import ToolExecutionRequest - adding it here for completeness
-from pydantic import BaseModel
-from typing import Dict, Any
-
-class ToolExecutionRequest(BaseModel):
-    """Tool execution request"""
-    action: str
-    parameters: Optional[Dict[str, Any]] = None
