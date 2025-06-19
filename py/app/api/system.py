@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from ..core.database import get_db
-from ..core.x_api_key_auth import verify_system_api_key
+from ..core.auth import system_auth_required, AuthResult
 
 router = APIRouter(prefix="/system", tags=["System"])
 
@@ -54,7 +54,7 @@ async def health_check():
 
 @router.get("/config")
 async def get_system_config(
-    _: bool = Depends(verify_system_api_key)
+    user: AuthResult = Depends(system_auth_required)
 ):
     """Get system configuration - Protected by X-API-KEY"""
     from ..core.toml_config import toml_config
@@ -72,7 +72,7 @@ async def get_system_config(
 
 @router.post("/config/reload")
 async def reload_system_config(
-    _: bool = Depends(verify_system_api_key)
+    user: AuthResult = Depends(system_auth_required)
 ):
     """Reload TOML configuration - Protected by X-API-KEY"""
     try:
@@ -94,7 +94,7 @@ async def reload_system_config(
 
 @router.post("/database/update")
 async def update_database(
-    _: bool = Depends(verify_system_api_key)
+    user: AuthResult = Depends(system_auth_required)
 ):
     """Update database schema (run migrations) - Protected by X-API-KEY"""
     try:
@@ -114,7 +114,7 @@ async def update_database(
 
 @router.post("/database/rollback")
 async def rollback_database(
-    _: bool = Depends(verify_system_api_key)
+    user: AuthResult = Depends(system_auth_required)
 ):
     """Rollback database schema changes - Protected by X-API-KEY"""
     try:

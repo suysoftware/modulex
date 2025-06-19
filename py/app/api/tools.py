@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from ..core.database import get_db
 from ..services.tool_service import ToolService
 from ..services.auth_service import AuthService
-from ..core.auth import auth_required, AuthResult
+from ..core.auth import user_auth_required, AuthResult
 
 
 class ToolExecutionRequest(BaseModel):
@@ -44,13 +44,13 @@ async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db)):
 async def execute_tool(
     tool_name: str,
     request: ToolExecutionRequest,
-    user: AuthResult = Depends(auth_required(endpoint_requires_user_id=True)),
+    user: AuthResult = Depends(user_auth_required),
     user_id: str = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
     """Execute a tool action - Auth required with user_id"""
     
-    # Get effective user_id based on auth method
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
     
     if not effective_user_id:
@@ -72,13 +72,13 @@ async def execute_tool(
 
 @router.get("/openai-tools")
 async def get_user_openai_tools(
-    user: AuthResult = Depends(auth_required(endpoint_requires_user_id=True)),
+    user: AuthResult = Depends(user_auth_required),
     user_id: str = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
     """Get user's authenticated and active tools in OpenAI tools format"""
     
-    # Get effective user_id based on auth method
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
     
     if not effective_user_id:

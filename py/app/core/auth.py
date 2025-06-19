@@ -1,23 +1,21 @@
 """
 Authentication Module for ModuleX
 
-Supports 3 authentication providers based on TOML config:
-1. default - X-API-KEY + user_id parameter required
-2. custom - X-API-KEY + user_id OR Authorization with custom endpoint verification
-3. supabase - X-API-KEY + user_id OR Authorization with Supabase verification
-
-IMPORTANT: User cannot send both X-API-KEY and Authorization headers simultaneously.
+Professional authentication system using Strategy Pattern:
+- UserAuthenticator: For user endpoints requiring user_id
+- SystemAuthenticator: For system/admin endpoints  
+- Clean separation of concerns and single responsibility principle
 """
 
 import os
 import httpx
 import logging
+from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, Union
 from fastapi import HTTPException, Depends, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .toml_config import toml_config
-from .x_api_key_auth import verify_x_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -31,18 +29,17 @@ class AuthResult:
         user_id: str, 
         auth_method: str, 
         additional_data: Optional[Dict] = None,
-        requires_user_id_param: bool = False
+        is_system_user: bool = False
     ):
         self.user_id = user_id
         self.auth_method = auth_method  # "x_api_key", "custom_token", "supabase_token"
         self.additional_data = additional_data or {}
-        self.requires_user_id_param = requires_user_id_param
+        self.is_system_user = is_system_user
 
-class AuthHandler:
-    """Main authentication handler based on TOML provider setting"""
+class BaseAuthenticator(ABC):
+    """Base authenticator interface following Strategy Pattern"""
     
     def __init__(self):
-        # Initialize Supabase client (lazy loading)
         self._supabase_client = None
     
     def _get_supabase_client(self):
@@ -64,26 +61,18 @@ class AuthHandler:
                 )
         return self._supabase_client
     
+    @abstractmethod
     async def authenticate(
         self,
         x_api_key: Optional[str] = None,
         credentials: Optional[HTTPAuthorizationCredentials] = None,
-        user_id: Optional[str] = None,
-        endpoint_requires_user_id: bool = True
+        user_id: Optional[str] = None
     ) -> AuthResult:
-        """
-        Main authentication method
-        
-        Args:
-            x_api_key: X-API-KEY header value
-            credentials: Authorization Bearer token
-            user_id: user_id parameter from request
-            endpoint_requires_user_id: Whether this endpoint requires user_id parameter
-            
-        Returns:
-            AuthResult: Authentication result with user info
-        """
-        # Check that user doesn't send both headers
+        """Authenticate request and return result"""
+        pass
+    
+    def _validate_headers(self, x_api_key: Optional[str], credentials: Optional[HTTPAuthorizationCredentials]):
+        """Common header validation"""
         if x_api_key and credentials:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -95,42 +84,9 @@ class AuthHandler:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Either X-API-KEY or Authorization header is required"
             )
-        
-        provider = toml_config.get_auth_provider()
-        
-        # Handle X-API-KEY authentication (available for all providers)
-        if x_api_key:
-            return await self._authenticate_with_x_api_key(
-                x_api_key, user_id, endpoint_requires_user_id, provider
-            )
-        
-        # Handle Authorization Bearer authentication
-        if credentials:
-            if provider == "default":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Authorization Bearer tokens not supported with 'default' provider. Use X-API-KEY instead."
-                )
-            elif provider == "custom":
-                return await self._authenticate_custom_token(credentials)
-            elif provider == "supabase":
-                return await self._authenticate_supabase_token(credentials)
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Unknown auth provider: {provider}"
-                )
     
-    async def _authenticate_with_x_api_key(
-        self, 
-        x_api_key: str, 
-        user_id: Optional[str], 
-        endpoint_requires_user_id: bool,
-        provider: str
-    ) -> AuthResult:
-        """Authenticate using X-API-KEY (works with all providers)"""
-        
-        # Verify X-API-KEY against MODULEX_API_KEY
+    def _verify_x_api_key(self, x_api_key: str) -> bool:
+        """Common X-API-KEY verification"""
         modulex_api_key = os.getenv("MODULEX_API_KEY")
         if not modulex_api_key:
             raise HTTPException(
@@ -144,23 +100,10 @@ class AuthHandler:
                 detail="Invalid X-API-KEY"
             )
         
-        # Check user_id parameter requirement
-        if endpoint_requires_user_id and not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="user_id parameter required when using X-API-KEY"
-            )
-        
-        return AuthResult(
-            user_id=user_id or "admin_user",
-            auth_method="x_api_key",
-            additional_data={"provider": provider},
-            requires_user_id_param=endpoint_requires_user_id
-        )
+        return True
     
     async def _authenticate_custom_token(self, credentials: HTTPAuthorizationCredentials) -> AuthResult:
         """Authenticate using custom token verification endpoint"""
-        
         custom_endpoint = os.getenv("CUSTOM_AUTH_TOKEN_VERIFICATION_ENDPOINT")
         if not custom_endpoint:
             raise HTTPException(
@@ -194,7 +137,8 @@ class AuthHandler:
                 return AuthResult(
                     user_id=str(user_id),
                     auth_method="custom_token",
-                    additional_data=user_data
+                    additional_data=user_data,
+                    is_system_user=False
                 )
                 
         except httpx.RequestError as e:
@@ -206,7 +150,6 @@ class AuthHandler:
     
     async def _authenticate_supabase_token(self, credentials: HTTPAuthorizationCredentials) -> AuthResult:
         """Authenticate using Supabase token verification"""
-        
         try:
             supabase = self._get_supabase_client()
             
@@ -229,7 +172,8 @@ class AuthHandler:
             return AuthResult(
                 user_id=response.user.id,
                 auth_method="supabase_token",
-                additional_data=user_data
+                additional_data=user_data,
+                is_system_user=False
             )
             
         except Exception as e:
@@ -239,64 +183,120 @@ class AuthHandler:
                 detail="Supabase token validation failed"
             )
 
-# Global auth handler
-auth_handler = AuthHandler()
-
-async def get_current_user(
-    x_api_key: Optional[str] = Header(None),
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    user_id: Optional[str] = None,
-    endpoint_requires_user_id: bool = True
-) -> AuthResult:
-    """
-    FastAPI dependency to get current authenticated user
+class UserAuthenticator(BaseAuthenticator):
+    """Authenticator for user endpoints - requires user_id for X-API-KEY"""
     
-    Usage in endpoints:
-        # For endpoints that require user_id parameter:
-        @router.get("/tools")
-        async def get_tools(
-            user: AuthResult = Depends(get_current_user), 
-            user_id: str = Query(None)
-        ):
-            effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
-        
-        # For endpoints that don't require user_id parameter:
-        @router.get("/health")  
-        async def health_check(
-            user: AuthResult = Depends(lambda: get_current_user(endpoint_requires_user_id=False))
-        ):
-            pass
-    """
-    return await auth_handler.authenticate(
-        x_api_key=x_api_key,
-        credentials=credentials, 
-        user_id=user_id,
-        endpoint_requires_user_id=endpoint_requires_user_id
-    )
-
-# Convenience functions for specific use cases
-def auth_required(endpoint_requires_user_id: bool = True):
-    """
-    Decorator-style function to create auth dependency
-    
-    Usage:
-        @router.get("/tools")
-        async def get_tools(
-            user: AuthResult = Depends(auth_required(endpoint_requires_user_id=True)),
-            user_id: str = Query(None)
-        ):
-            pass
-    """
-    async def _auth_dependency(
-        x_api_key: Optional[str] = Header(None),
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    async def authenticate(
+        self,
+        x_api_key: Optional[str] = None,
+        credentials: Optional[HTTPAuthorizationCredentials] = None,
         user_id: Optional[str] = None
     ) -> AuthResult:
-        return await auth_handler.authenticate(
-            x_api_key=x_api_key,
-            credentials=credentials,
-            user_id=user_id,
-            endpoint_requires_user_id=endpoint_requires_user_id
-        )
+        """Authenticate user request"""
+        self._validate_headers(x_api_key, credentials)
+        provider = toml_config.get_auth_provider()
+        
+        # Handle X-API-KEY authentication
+        if x_api_key:
+            self._verify_x_api_key(x_api_key)
+            
+            # User endpoints require user_id parameter
+            if not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="user_id parameter required for user endpoints when using X-API-KEY"
+                )
+            
+            return AuthResult(
+                user_id=user_id,
+                auth_method="x_api_key",
+                additional_data={"provider": provider},
+                is_system_user=False
+            )
+        
+        # Handle Authorization Bearer authentication
+        if credentials:
+            if provider == "default":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Authorization Bearer tokens not supported with 'default' provider. Use X-API-KEY instead."
+                )
+            elif provider == "custom":
+                return await self._authenticate_custom_token(credentials)
+            elif provider == "supabase":
+                return await self._authenticate_supabase_token(credentials)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Unknown auth provider: {provider}"
+                )
+
+class SystemAuthenticator(BaseAuthenticator):
+    """Authenticator for system endpoints - X-API-KEY only, user_id optional"""
     
-    return _auth_dependency 
+    async def authenticate(
+        self,
+        x_api_key: Optional[str] = None,
+        credentials: Optional[HTTPAuthorizationCredentials] = None,
+        user_id: Optional[str] = None
+    ) -> AuthResult:
+        """Authenticate system request"""
+        # System endpoints only accept X-API-KEY
+        if credentials:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="System endpoints only accept X-API-KEY authentication"
+            )
+        
+        if not x_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="X-API-KEY header required for system endpoints"
+            )
+        
+        self._verify_x_api_key(x_api_key)
+        provider = toml_config.get_auth_provider()
+        
+        return AuthResult(
+            user_id=user_id or "system_admin",
+            auth_method="x_api_key",
+            additional_data={"provider": provider},
+            is_system_user=True
+        )
+
+# Global authenticator instances
+user_authenticator = UserAuthenticator()
+system_authenticator = SystemAuthenticator()
+
+# Clean, professional authentication dependencies
+async def user_auth_required(
+    x_api_key: Optional[str] = Header(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    user_id: Optional[str] = None
+) -> AuthResult:
+    """
+    Authentication dependency for user endpoints (tools, auth, etc.)
+    Uses UserAuthenticator strategy
+    """
+    return await user_authenticator.authenticate(
+        x_api_key=x_api_key,
+        credentials=credentials,
+        user_id=user_id
+    )
+
+async def system_auth_required(
+    x_api_key: Optional[str] = Header(None),
+    user_id: Optional[str] = None
+) -> AuthResult:
+    """
+    Authentication dependency for system endpoints (config, health, etc.)
+    Uses SystemAuthenticator strategy
+    """
+    return await system_authenticator.authenticate(
+        x_api_key=x_api_key,
+        credentials=None,
+        user_id=user_id
+    )
+
+# Backward compatibility alias
+auth_required = lambda endpoint_requires_user_id=True: user_auth_required if endpoint_requires_user_id else system_auth_required 
