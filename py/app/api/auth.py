@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from ..core.database import get_db
 from ..services.auth_service import AuthService
 from ..core.auth import auth_required, AuthResult
+from ..core.config import verify_api_key
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
