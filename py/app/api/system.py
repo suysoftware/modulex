@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from ..core.database import get_db
-from ..core.config import verify_api_key
+from ..core.x_api_key_auth import verify_system_api_key
 
 router = APIRouter(prefix="/system", tags=["System"])
 
@@ -52,11 +52,51 @@ async def health_check():
     }
 
 
+@router.get("/config")
+async def get_system_config(
+    _: bool = Depends(verify_system_api_key)
+):
+    """Get system configuration - Protected by X-API-KEY"""
+    from ..core.toml_config import toml_config
+    
+    config_info = toml_config.get_config_info()
+    
+    return {
+        "success": True,
+        "auth_provider": toml_config.get_auth_provider(),
+        "config_info": config_info,
+        "loaded_config_path": toml_config.get_loaded_config_path(),
+        "message": "System configuration retrieved successfully"
+    }
+
+
+@router.post("/config/reload")
+async def reload_system_config(
+    _: bool = Depends(verify_system_api_key)
+):
+    """Reload TOML configuration - Protected by X-API-KEY"""
+    try:
+        from ..core.toml_config import toml_config
+        toml_config.reload()
+        
+        return {
+            "success": True,
+            "auth_provider": toml_config.get_auth_provider(),
+            "message": "Configuration reloaded successfully"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to reload configuration"
+        }
+
+
 @router.post("/database/update")
 async def update_database(
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_system_api_key)
 ):
-    """Update database schema (run migrations) - Protected by API key"""
+    """Update database schema (run migrations) - Protected by X-API-KEY"""
     try:
         await run_migrations()
         return {
@@ -74,9 +114,9 @@ async def update_database(
 
 @router.post("/database/rollback")
 async def rollback_database(
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_system_api_key)
 ):
-    """Rollback database schema changes - Protected by API key"""
+    """Rollback database schema changes - Protected by X-API-KEY"""
     try:
         # Add migrations directory to path
         migrations_path = Path(__file__).parent.parent.parent / "migrations"
