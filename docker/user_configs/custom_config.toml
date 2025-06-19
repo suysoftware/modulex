@@ -1,0 +1,9 @@
+# ModuleX Default Configuration
+# This is the default configuration file for ModuleX
+# You can override these settings by creating a custom config file
+# and setting MODULEX_CONFIG_PATH environment variable
+
+[auth]
+# Authentication provider configuration
+# Options: default, custom, supabase
+provider = "default" 

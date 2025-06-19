@@ -1,8 +1,0 @@
-# Example ModuleX Configuration
-# Copy this file and customize it for your needs
-# Set MODULEX_CONFIG_PATH to point to your custom config file
-
-[auth]
-# Authentication provider configuration
-# Options: default, custom, supabase
-provider = "custom" 

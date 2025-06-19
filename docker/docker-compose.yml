@@ -123,6 +123,7 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
+      - ./user_configs:/app/docker/user_configs
     networks:
       - modulex_network
     restart: unless-stopped
