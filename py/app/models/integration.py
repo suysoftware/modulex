@@ -4,7 +4,7 @@ Integration Models for Dynamic Tool Management
 from sqlalchemy import Column, Integer, String, Text, DateTime, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
-from .base import Base
+from ..core.database import Base
 
 class AvailableTool(Base):
     """Available tools that can be installed (from integrations/ folder)"""
