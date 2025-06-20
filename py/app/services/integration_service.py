@@ -20,7 +20,7 @@ class IntegrationService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.integrations_path = Path("py/integrations")
+        self.integrations_path = Path("integrations")
         self.env_file_path = Path("docker/env/modulex.env")
     
     async def sync_available_tools(self) -> int:
