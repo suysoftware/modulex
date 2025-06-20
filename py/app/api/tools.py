@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from ..core.database import get_db
 from ..services.tool_service import ToolService
+from ..services.integration_service import IntegrationService
 from ..services.auth_service import AuthService
 from ..core.auth import user_auth_required, AuthResult
 
@@ -22,17 +23,17 @@ router = APIRouter(prefix="/tools", tags=["Tools"])
 
 @router.get("/")
 async def list_tools(db: AsyncSession = Depends(get_db)):
-    """List all available tools - No auth required"""
-    tool_service = ToolService(db)
-    tools = await tool_service.get_all_tools()
+    """List all available tools from database - No auth required"""
+    integration_service = IntegrationService(db)
+    tools = await integration_service.get_available_tools()
     return {"tools": tools}
 
 
 @router.get("/{tool_name}")
 async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db)):
-    """Get information about a specific tool - No auth required"""
-    tool_service = ToolService(db)
-    tool_info = await tool_service.get_tool_info(tool_name)
+    """Get information about a specific tool from database - No auth required"""
+    integration_service = IntegrationService(db)
+    tool_info = await integration_service.get_available_tool_by_name(tool_name)
     
     if not tool_info:
         raise HTTPException(status_code=404, detail="Tool not found")

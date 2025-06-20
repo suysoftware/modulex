@@ -250,6 +250,29 @@ class IntegrationService:
             for tool in tools
         ]
     
+    async def get_available_tool_by_name(self, tool_name: str) -> Optional[Dict[str, Any]]:
+        """Get a specific available tool by name"""
+        result = await self.db.execute(
+            select(AvailableTool).where(AvailableTool.name == tool_name)
+        )
+        tool = result.scalar_one_or_none()
+        
+        if not tool:
+            return None
+        
+        return {
+            "id": tool.id,
+            "name": tool.name,
+            "display_name": tool.display_name,
+            "description": tool.description,
+            "author": tool.author,
+            "version": tool.version,
+            "actions": tool.actions,
+            "environment_variables": tool.environment_variables,
+            "created_at": tool.created_at.isoformat() if tool.created_at else None,
+            "updated_at": tool.updated_at.isoformat() if tool.updated_at else None
+        }
+    
     async def get_installed_tools(self) -> List[Dict[str, Any]]:
         """Get all installed tools"""
         result = await self.db.execute(select(InstalledTool))
