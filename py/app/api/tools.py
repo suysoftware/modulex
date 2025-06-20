@@ -21,24 +21,24 @@ class ToolExecutionRequest(BaseModel):
 router = APIRouter(prefix="/tools", tags=["Tools"])
 
 
-@router.get("/")
-async def list_tools(db: AsyncSession = Depends(get_db)):
-    """List all available tools from database - No auth required"""
-    integration_service = IntegrationService(db)
-    tools = await integration_service.get_available_tools()
-    return {"tools": tools}
-
-
-@router.get("/{tool_name}")
-async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db)):
-    """Get information about a specific tool from database - No auth required"""
-    integration_service = IntegrationService(db)
-    tool_info = await integration_service.get_available_tool_by_name(tool_name)
-    
-    if not tool_info:
-        raise HTTPException(status_code=404, detail="Tool not found")
-    
-    return tool_info
+# @router.get("/")
+# async def list_tools(db: AsyncSession = Depends(get_db)):
+#     """List all available tools from database - No auth required"""
+#     integration_service = IntegrationService(db)
+#     tools = await integration_service.get_available_tools()
+#     return {"tools": tools}
+# 
+# 
+# @router.get("/{tool_name}")
+# async def get_tool_info(tool_name: str, db: AsyncSession = Depends(get_db)):
+#     """Get information about a specific tool from database - No auth required"""
+#     integration_service = IntegrationService(db)
+#     tool_info = await integration_service.get_available_tool_by_name(tool_name)
+#     
+#     if not tool_info:
+#         raise HTTPException(status_code=404, detail="Tool not found")
+#     
+#     return tool_info
 
 
 @router.post("/{tool_name}/execute")
