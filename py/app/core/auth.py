@@ -140,15 +140,25 @@ class BaseAuthenticator(ABC):
                 ]
                 
                 user_id = None
+                
+                # First, try to find user_id at root level
                 for key in possible_user_id_keys:
                     if key in user_data and user_data[key]:
                         user_id = user_data[key]
                         break
                 
+                # If not found at root level, try inside 'user' object
+                if not user_id and isinstance(user_data.get("user"), dict):
+                    user_obj = user_data["user"]
+                    for key in possible_user_id_keys:
+                        if key in user_obj and user_obj[key]:
+                            user_id = user_obj[key]
+                            break
+                
                 if not user_id:
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail=f"Invalid token: no user identifier found. Expected one of: {', '.join(possible_user_id_keys)}"
+                        detail=f"Invalid token: no user identifier found. Expected one of: {', '.join(possible_user_id_keys)} at root level or inside 'user' object"
                     )
                 
                 return AuthResult(
