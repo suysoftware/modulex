@@ -126,12 +126,29 @@ class BaseAuthenticator(ABC):
                     )
                 
                 user_data = response.json()
-                user_id = user_data.get("user_id")
+                
+                # Try different possible keys for user_id in order of preference
+                possible_user_id_keys = [
+                    "user_id", 
+                    "id", 
+                    "userId", 
+                    "uid", 
+                    "userUid", 
+                    "user_uid", 
+                    "user_no", 
+                    "userNo"
+                ]
+                
+                user_id = None
+                for key in possible_user_id_keys:
+                    if key in user_data and user_data[key]:
+                        user_id = user_data[key]
+                        break
                 
                 if not user_id:
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Invalid token: no user_id returned from verification endpoint"
+                        detail=f"Invalid token: no user identifier found. Expected one of: {', '.join(possible_user_id_keys)}"
                     )
                 
                 return AuthResult(
