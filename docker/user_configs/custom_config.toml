@@ -6,4 +6,4 @@
 [auth]
 # Authentication provider configuration
 # Options: default, custom, supabase
-provider = "default" 
+provider = "custom"
