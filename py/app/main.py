@@ -20,10 +20,10 @@ async def lifespan(app: FastAPI):
     
     # Sync integrations on startup
     try:
-        from .core.database import get_db_session
+        from .core.database import AsyncSessionLocal
         from .services.integration_service import IntegrationService
         
-        async with get_db_session() as db:
+        async with AsyncSessionLocal() as db:
             integration_service = IntegrationService(db)
             
             # Sync available tools from integrations folder
