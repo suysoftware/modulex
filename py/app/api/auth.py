@@ -471,8 +471,12 @@ async def register_manual_auth(
     # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
     
+    # user_id is only required when using X-API-KEY
+    if user.auth_method == "x_api_key" and not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required when using X-API-KEY")
+    
     if not effective_user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
+        raise HTTPException(status_code=400, detail="user_id could not be determined")
     
     try:
         success = await auth_service.register_manual_auth(
@@ -521,7 +525,7 @@ async def auth_callback(
 
 @router.get("/tools")
 async def get_user_tools(
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Query(None, description="User ID (required when using X-API-KEY)"),
     detail: bool = Query(False, description="Return detailed tool information"),
     db: AsyncSession = Depends(get_db),
     user: AuthResult = Depends(user_auth_required)
@@ -532,8 +536,12 @@ async def get_user_tools(
     # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
     
+    # user_id is only required when using X-API-KEY
+    if user.auth_method == "x_api_key" and not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required when using X-API-KEY")
+    
     if not effective_user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
+        raise HTTPException(status_code=400, detail="user_id could not be determined")
     
     try:
         tools = await auth_service.get_all_tools_with_user_status(effective_user_id, detail)
@@ -548,7 +556,7 @@ async def get_user_tools(
 @router.put("/tools/{tool_name}/status")
 async def set_tool_active_status(
     tool_name: str = Path(..., description="Tool name"),
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Query(None, description="User ID (required when using X-API-KEY)"),
     request: ToolActiveStatusRequest = ...,
     db: AsyncSession = Depends(get_db),
     auth_user: AuthResult = Depends(user_auth_required)
@@ -559,8 +567,12 @@ async def set_tool_active_status(
     # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if auth_user.auth_method == "x_api_key" else auth_user.user_id
     
+    # user_id is only required when using X-API-KEY
+    if auth_user.auth_method == "x_api_key" and not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required when using X-API-KEY")
+    
     if not effective_user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
+        raise HTTPException(status_code=400, detail="user_id could not be determined")
     
     try:
         success = await auth_service.set_tool_active_status(effective_user_id, tool_name, request.is_active)
@@ -587,7 +599,7 @@ async def set_tool_active_status(
 async def set_action_disabled_status(
     tool_name: str = Path(..., description="Tool name"),
     action_name: str = Path(..., description="Action name"),
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Query(None, description="User ID (required when using X-API-KEY)"),
     request: ActionDisabledStatusRequest = ...,
     db: AsyncSession = Depends(get_db),
     auth_user: AuthResult = Depends(user_auth_required)
@@ -598,8 +610,12 @@ async def set_action_disabled_status(
     # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if auth_user.auth_method == "x_api_key" else auth_user.user_id
     
+    # user_id is only required when using X-API-KEY
+    if auth_user.auth_method == "x_api_key" and not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required when using X-API-KEY")
+    
     if not effective_user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
+        raise HTTPException(status_code=400, detail="user_id could not be determined")
     
     try:
         success = await auth_service.set_action_disabled_status(
@@ -628,7 +644,7 @@ async def set_action_disabled_status(
 @router.delete("/tools/{tool_name}")
 async def disconnect_tool(
     tool_name: str = Path(..., description="Tool name"),
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Query(None, description="User ID (required when using X-API-KEY)"),
     db: AsyncSession = Depends(get_db),
     auth_user: AuthResult = Depends(user_auth_required)
 ):
@@ -638,8 +654,12 @@ async def disconnect_tool(
     # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if auth_user.auth_method == "x_api_key" else auth_user.user_id
     
+    # user_id is only required when using X-API-KEY
+    if auth_user.auth_method == "x_api_key" and not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required when using X-API-KEY")
+    
     if not effective_user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
+        raise HTTPException(status_code=400, detail="user_id could not be determined")
     
     try:
         success = await auth_service.disconnect_tool(effective_user_id, tool_name)
