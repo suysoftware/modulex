@@ -161,7 +161,7 @@ class ToolService:
     @lru_cache(maxsize=1000)
     def _get_excluded_credential_keys(self) -> frozenset:
         """Cache excluded credential keys for performance"""
-        return frozenset(["auth_type", "registered_at"])
+        return frozenset(["auth_type", "registered_at", "authenticated_at", "user_id"])
 
     def _prepare_tool_env(self, credentials: Dict[str, Any]) -> Dict[str, str]:
         """Prepare environment variables for tool execution

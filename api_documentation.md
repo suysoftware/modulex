@@ -66,24 +66,24 @@ ModuleX is a simple tool authentication and execution server that supports OAuth
 
 ## 🔐 Authentication Endpoints
 
-### 1. Get OAuth Authorization URL
+### 1. Get OAuth Authorization URL or Handle Manual Auth
 - **Method:** `GET`
 - **Path:** `/auth/url/{tool_name}`
-- **Description:** Generate OAuth authorization URL for a specific tool
-- **Authentication:** None required
+- **Description:** Generate OAuth authorization URL for OAuth2 tools, or automatically handle authentication for manual auth tools
+- **Authentication:** User ID required
 
 **Path Parameters:**
-- `tool_name` (string): Name of the tool (e.g., "github", "google", "slack")
+- `tool_name` (string): Name of the tool (e.g., "github", "google", "slack", "r2r")
 
 **Query Parameters:**
 - `user_id` (string, required): User identifier
 
-**Request Example:**
+**Request Example (OAuth2 tool like GitHub):**
 ```bash
 GET /auth/url/github?user_id=user123
 ```
 
-**Response Example:**
+**Response Example (OAuth2 tool):**
 ```json
 {
   "auth_url": "https://github.com/login/oauth/authorize?client_id=...",
@@ -91,6 +91,27 @@ GET /auth/url/github?user_id=user123
   "tool_name": "github"
 }
 ```
+
+**Request Example (Manual auth tool like R2R):**
+```bash
+GET /auth/url/r2r?user_id=user123
+```
+
+**Response Example (Manual auth tool):**
+```json
+{
+  "success": true,
+  "message": "Manual authentication completed for r2r",
+  "tool_name": "r2r",
+  "user_id": "user123"
+}
+```
+
+**Note:** For tools with `auth_type: "manual"`, this endpoint automatically:
+1. Calls the tool's auth_url with user_id parameter
+2. Processes the response
+3. Completes the authentication automatically
+4. Returns success/failure status
 
 ### 2. Manual Authentication
 - **Method:** `POST`

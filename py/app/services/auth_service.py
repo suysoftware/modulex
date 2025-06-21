@@ -456,6 +456,111 @@ class AuthService:
         
         return False
 
+    async def get_tool_auth_type(self, tool_name: str) -> Optional[str]:
+        """Get the auth_type for a tool by reading its info.json file"""
+        try:
+            from pathlib import Path
+            info_file = Path("integrations") / tool_name / "info.json"
+            
+            if not info_file.exists():
+                return None
+            
+            with open(info_file, 'r') as f:
+                tool_info = json.load(f)
+                return tool_info.get("auth_type")
+        except Exception as e:
+            print(f"💥 DEBUG: Error reading tool info for {tool_name}: {e}")
+            return None
+
+    async def handle_manual_auth_url(self, user_id: str, tool_name: str) -> Dict[str, Any]:
+        """Handle auth URL request for manual auth tools"""
+        if tool_name not in self.OAUTH_CONFIGS:
+            raise ValueError(f"Tool {tool_name} not configured in OAUTH_CONFIGS")
+        
+        config = self.OAUTH_CONFIGS[tool_name]
+        auth_url = config.get("auth_url")
+        
+        if not auth_url:
+            raise ValueError(f"No auth_url configured for tool {tool_name}")
+        
+        try:
+            # Make GET request to auth_url with user_id parameter
+            async with httpx.AsyncClient() as client:
+                response = await client.get(auth_url, params={"user_id": user_id})
+                response.raise_for_status()
+                
+                # Get response data
+                if response.headers.get("content-type", "").startswith("application/json"):
+                    auth_data = response.json()
+                else:
+                    # If not JSON, treat as text response
+                    auth_data = {"response": response.text}
+                
+                # Automatically start handle_callback process
+                success = await self.handle_manual_callback(tool_name, user_id, auth_data)
+                
+                if success:
+                    return {
+                        "success": True,
+                        "message": f"Manual authentication completed for {tool_name}",
+                        "tool_name": tool_name,
+                        "user_id": user_id
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Manual authentication callback failed",
+                        "tool_name": tool_name,
+                        "user_id": user_id
+                    }
+                    
+        except httpx.RequestError as e:
+            raise ValueError(f"Failed to connect to auth URL: {str(e)}")
+        except httpx.HTTPStatusError as e:
+            raise ValueError(f"Auth URL returned error: {e.response.status_code}")
+        except Exception as e:
+            raise ValueError(f"Manual auth failed: {str(e)}")
+
+    async def handle_manual_callback(self, tool_name: str, user_id: str, auth_data: Dict[str, Any]) -> bool:
+        """Handle manual authentication callback"""
+        try:
+            # Prepare credentials data similar to OAuth flow
+            credentials_data = {
+                "auth_type": "manual",
+                "authenticated_at": datetime.utcnow().isoformat(),
+                "user_id": user_id  # Store user_id for reference
+            }
+            
+            # Process the auth_data response
+            if isinstance(auth_data, dict):
+                # Handle access_token response format
+                if "access_token" in auth_data:
+                    credentials_data["access_token"] = auth_data["access_token"]
+                    print(f"🔑 DEBUG: Found access_token in manual auth response")
+                
+                # Include all other response data
+                for key, value in auth_data.items():
+                    if key not in credentials_data:  # Don't override existing keys
+                        credentials_data[key] = value
+            else:
+                # If auth_data is not a dict, store it as raw response
+                credentials_data["raw_response"] = auth_data
+            
+            print(f"🔐 DEBUG: Prepared credentials for encryption, keys: {list(credentials_data.keys())}")
+            
+            # Get or create user
+            user = await self.get_or_create_user(user_id)
+            
+            # Save credentials using existing method (this encrypts the data)
+            await self._save_credentials(user, tool_name, credentials_data)
+            
+            print(f"✅ DEBUG: Manual auth callback completed and encrypted for user_id={user_id}, tool_name={tool_name}")
+            return True
+            
+        except Exception as e:
+            print(f"💥 DEBUG: Manual auth callback failed for user_id={user_id}, tool_name={tool_name}: {str(e)}")
+            return False
+
     async def get_all_tools_with_user_status(self, user_id: str, detail: bool = False):
         """Get all available tools with user authentication and active status"""
         # Import here to avoid circular import

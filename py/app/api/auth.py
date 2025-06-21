@@ -441,19 +441,28 @@ async def get_auth_url(
     user_id: str = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get OAuth authorization URL for a tool"""
+    """Get OAuth authorization URL for a tool or handle manual auth"""
     auth_service = AuthService(db)
     
     # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
     effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
     
     try:
-        auth_url, state = await auth_service.generate_auth_url(effective_user_id, tool_name)
-        return {
-            "auth_url": auth_url,
-            "state": state,
-            "tool_name": tool_name
-        }
+        # Check the auth_type of the tool
+        auth_type = await auth_service.get_tool_auth_type(tool_name)
+        
+        if auth_type == "manual":
+            # Handle manual authentication
+            result = await auth_service.handle_manual_auth_url(effective_user_id, tool_name)
+            return result
+        else:
+            # Handle OAuth2 authentication (existing flow)
+            auth_url, state = await auth_service.generate_auth_url(effective_user_id, tool_name)
+            return {
+                "auth_url": auth_url,
+                "state": state,
+                "tool_name": tool_name
+            }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
