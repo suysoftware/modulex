@@ -30,6 +30,9 @@ class Settings:
     SLACK_CLIENT_ID: str = os.getenv("SLACK_CLIENT_ID", "")
     SLACK_CLIENT_SECRET: str = os.getenv("SLACK_CLIENT_SECRET", "")
     
+    R2R_BASE_URL: str = os.getenv("R2R_BASE_URL", "")
+    R2R_AUTH_URL: str = os.getenv("R2R_AUTH_URL", "")
+    
     # Server
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"

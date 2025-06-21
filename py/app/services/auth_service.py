@@ -41,6 +41,9 @@ class AuthService:
             "client_id": settings.SLACK_CLIENT_ID,
             "client_secret": settings.SLACK_CLIENT_SECRET,
         },
+        "r2r":{
+            "auth_url": settings.R2R_AUTH_URL,
+        }
     }
     
     def __init__(self, db: AsyncSession):
