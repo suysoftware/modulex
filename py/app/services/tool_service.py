@@ -23,7 +23,7 @@ class ToolService:
     def __init__(self, db: AsyncSession, max_concurrent_executions: int = None):
         self.db = db
         self.auth_service = AuthService(db)
-        self.integrations_path = Path("py/integrations")
+        self.integrations_path = Path("integrations")
         
         # Load configuration based on environment or Azure setup
         self.load_config = get_load_config()
