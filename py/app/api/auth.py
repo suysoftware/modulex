@@ -1,7 +1,7 @@
 """
 Authentication API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
@@ -452,8 +452,12 @@ async def get_auth_url(
         auth_type = await auth_service.get_tool_auth_type(tool_name)
         
         if auth_type == "manual":
-            # Handle manual authentication
+            # Handle manual authentication (r2r style)
             result = await auth_service.handle_manual_auth_url(effective_user_id, tool_name)
+            return result
+        elif auth_type == "api_key":
+            # Handle form-based authentication (n8n style)
+            result = await auth_service.handle_form_auth_url(effective_user_id, tool_name)
             return result
         else:
             # Handle OAuth2 authentication (existing flow)
@@ -521,11 +525,89 @@ async def auth_callback(
     auth_service = AuthService(db)
     
     try:
+        # Handle traditional OAuth callback
         success = await auth_service.handle_callback(tool_name, code, state)
         if success:
             return HTMLResponse(content=get_success_html(tool_name), status_code=200)
         else:
             return HTMLResponse(content=get_error_html(tool_name, "Authentication process failed"), status_code=400)
+    except ValueError as e:
+        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
+    except Exception as e:
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
+
+
+@callback_router.get("/callback/form/{tool_name}", response_class=HTMLResponse)
+async def form_auth_callback(
+    tool_name: str,
+    user_id: str = Query(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle form-based auth success callback - Returns beautiful HTML page"""
+    try:
+        # For form-based auth, credentials were already saved in form submit
+        # Just return success page
+        return HTMLResponse(content=get_success_html(tool_name), status_code=200)
+    except Exception as e:
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
+
+
+@callback_router.get("/form/{tool_name}", response_class=HTMLResponse)
+async def auth_form(
+    tool_name: str,
+    user_id: str = Query(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Show authentication form for tools that require manual credential input"""
+    auth_service = AuthService(db)
+    
+    try:
+        form_html = await auth_service.generate_auth_form(user_id, tool_name)
+        return HTMLResponse(content=form_html, status_code=200)
+    except ValueError as e:
+        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
+    except Exception as e:
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
+
+
+@callback_router.post("/form/{tool_name}", response_class=HTMLResponse)
+async def handle_auth_form_submit(
+    tool_name: str,
+    user_id: str = Query(...),
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle form submission for tools that require manual credential input"""
+    from fastapi import Request
+    
+    auth_service = AuthService(db)
+    
+    try:
+        # Get form data
+        form_data = await request.form()
+        credentials = {}
+        for key, value in form_data.items():
+            if key != "user_id":  # Exclude user_id from credentials
+                credentials[key] = value
+        
+        # Save credentials using manual auth method
+        success = await auth_service.register_manual_auth(
+            user_id=user_id,
+            tool_name=tool_name,
+            credentials=credentials
+        )
+        
+        if success:
+            return HTMLResponse(
+                content=get_success_html(tool_name),
+                status_code=200
+            )
+        else:
+            return HTMLResponse(
+                content=get_error_html(tool_name, "Failed to save credentials"),
+                status_code=400
+            )
+            
     except ValueError as e:
         return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
     except Exception as e:

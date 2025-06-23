@@ -1,0 +1,63 @@
+{
+    "name": "n8n",
+    "display_name": "N8N Workflow Automation",
+    "description": "Integration with n8n workflow automation platform for managing workflows, nodes, and automations",
+    "version": "1.0.0",
+    "author": "ModuleX",
+    "requires_auth": true,
+    "auth_type": "api_key",
+    "setup_environment_variables": [
+    ],
+    "environment_variables": [
+        {
+            "name": "base_url",
+            "description": "N8N Instance Base URL",
+            "required": true,
+            "example": "https://your-n8n-instance.com"
+        },
+        {
+            "name": "api_key",
+            "description": "N8N API Key",
+            "required": true,
+            "example": "n8n_api_xxxxxxxxxxxxxxxx"
+        }
+    ],
+    "actions": [
+        {
+            "name": "test_connection",
+            "description": "Test connection to n8n instance using user credentials",
+            "parameters": {}
+        },
+        {
+            "name": "list_workflows",
+            "description": "List all workflows from the n8n instance using user credentials",
+            "parameters": {}
+        },
+        {
+            "name": "create_workflow",
+            "description": "Create a new workflow in n8n with specified nodes and connections",
+            "parameters": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the workflow to create",
+                    "required": true,
+                    "optional": false
+                },
+                "nodes": {
+                    "type": "array",
+                    "description": "Array of nodes to include in the workflow",
+                    "required": false,
+                    "optional": true,
+                    "default": []
+                },
+                "connections": {
+                    "type": "object",
+                    "description": "Object defining connections between nodes",
+                    "required": false,
+                    "optional": true,
+                    "default": {}
+                }
+            }
+        }
+    ]
+}

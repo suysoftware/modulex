@@ -561,6 +561,312 @@ class AuthService:
             print(f"💥 DEBUG: Manual auth callback failed for user_id={user_id}, tool_name={tool_name}: {str(e)}")
             return False
 
+    async def handle_form_auth_url(self, user_id: str, tool_name: str) -> Dict[str, Any]:
+        """Handle auth URL request for form-based auth tools (like n8n)"""
+        try:
+            # Generate form URL
+            form_url = f"{settings.BASE_URL}/auth/form/{tool_name}?user_id={user_id}"
+            
+            return {
+                "auth_url": form_url,
+                "tool_name": tool_name,
+                "user_id": user_id,
+                "auth_type": "form"
+            }
+            
+        except Exception as e:
+            raise ValueError(f"Form auth URL generation failed: {str(e)}")
+
+    async def generate_auth_form(self, user_id: str, tool_name: str) -> str:
+        """Generate authentication form HTML for form-based tools"""
+        try:
+            # Get tool info to determine required fields
+            tool_info = await self.get_tool_info(tool_name)
+            if not tool_info:
+                raise ValueError(f"Tool {tool_name} not found")
+            
+            # Get environment variables that are required
+            env_vars = tool_info.get("environment_variables", [])
+            required_fields = []
+            
+            for env_var in env_vars:
+                field_info = {
+                    "name": env_var["name"],
+                    "description": env_var.get("description", env_var["name"]),
+                    "required": env_var.get("required", True),
+                    "type": "password" if "password" in env_var["name"].lower() or "key" in env_var["name"].lower() or "secret" in env_var["name"].lower() else "text"
+                }
+                required_fields.append(field_info)
+            
+            # Generate form HTML
+            form_html = self._generate_form_html(tool_name, user_id, required_fields)
+            return form_html
+            
+        except Exception as e:
+            raise ValueError(f"Form generation failed: {str(e)}")
+
+    async def get_tool_info(self, tool_name: str) -> Optional[Dict[str, Any]]:
+        """Get tool information from info.json file"""
+        try:
+            from pathlib import Path
+            import json
+            
+            info_file = Path("integrations") / tool_name / "info.json"
+            
+            if not info_file.exists():
+                return None
+            
+            with open(info_file, 'r') as f:
+                tool_info = json.load(f)
+                return tool_info
+        except Exception as e:
+            print(f"💥 DEBUG: Error reading tool info for {tool_name}: {e}")
+            return None
+
+    def _generate_form_html(self, tool_name: str, user_id: str, required_fields: list) -> str:
+        """Generate beautiful form HTML"""
+        tool_display_names = {
+            "n8n": "N8N Workflow Automation",
+            "api_key": "API Key Authentication",
+        }
+        
+        display_name = tool_display_names.get(tool_name, tool_name.title())
+        
+        # Generate form fields
+        form_fields = ""
+        for field in required_fields:
+            field_name = field["name"]
+            field_type = field["type"]
+            field_desc = field["description"]
+            is_required = field["required"]
+            
+            form_fields += f"""
+                <div class="form-group">
+                    <label for="{field_name}" class="form-label">
+                        {field_desc}
+                        {' <span class="required">*</span>' if is_required else ''}
+                    </label>
+                    <input 
+                        type="{field_type}" 
+                        id="{field_name}" 
+                        name="{field_name}" 
+                        class="form-input" 
+                        placeholder="Enter your {field_desc.lower()}"
+                        {'required' if is_required else ''}
+                    />
+                </div>
+            """
+        
+        return f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Connect {display_name} - ModuleX</title>
+            <style>
+                * {{
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }}
+                
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                    min-height: 100vh;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }}
+                
+                .container {{
+                    background: white;
+                    border-radius: 16px;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                    padding: 40px;
+                    max-width: 500px;
+                    width: 100%;
+                    animation: slideUp 0.6s ease-out;
+                }}
+                
+                @keyframes slideUp {{
+                    from {{
+                        opacity: 0;
+                        transform: translateY(30px);
+                    }}
+                    to {{
+                        opacity: 1;
+                        transform: translateY(0);
+                    }}
+                }}
+                
+                .header {{
+                    text-align: center;
+                    margin-bottom: 32px;
+                }}
+                
+                .tool-icon {{
+                    width: 64px;
+                    height: 64px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 12px;
+                    margin: 0 auto 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 28px;
+                    font-weight: bold;
+                }}
+                
+                .title {{
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: #1f2937;
+                    margin-bottom: 8px;
+                }}
+                
+                .subtitle {{
+                    color: #6b7280;
+                    font-size: 14px;
+                    line-height: 1.5;
+                }}
+                
+                .form-group {{
+                    margin-bottom: 20px;
+                }}
+                
+                .form-label {{
+                    display: block;
+                    font-weight: 600;
+                    color: #374151;
+                    margin-bottom: 8px;
+                    font-size: 14px;
+                }}
+                
+                .required {{
+                    color: #ef4444;
+                }}
+                
+                .form-input {{
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                    background: #f9fafb;
+                }}
+                
+                .form-input:focus {{
+                    outline: none;
+                    border-color: #667eea;
+                    background: white;
+                    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                }}
+                
+                .submit-button {{
+                    width: 100%;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    padding: 14px 20px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    margin-top: 8px;
+                }}
+                
+                .submit-button:hover {{
+                    transform: translateY(-1px);
+                    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+                }}
+                
+                .submit-button:active {{
+                    transform: translateY(0);
+                }}
+                
+                .footer {{
+                    text-align: center;
+                    margin-top: 24px;
+                    font-size: 12px;
+                    color: #9CA3AF;
+                }}
+                
+                .error-message {{
+                    background: #fee2e2;
+                    color: #dc2626;
+                    padding: 12px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    font-size: 14px;
+                    display: none;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="tool-icon">
+                        {display_name[0]}
+                    </div>
+                    <h1 class="title">Connect {display_name}</h1>
+                    <p class="subtitle">
+                        Enter your {display_name} credentials to connect your account with ModuleX.
+                        This information will be securely encrypted and stored.
+                    </p>
+                </div>
+                
+                <div id="error-message" class="error-message"></div>
+                
+                <form id="auth-form" action="/auth/form/{tool_name}?user_id={user_id}" method="POST">
+                    {form_fields}
+                    
+                    <button type="submit" class="submit-button">
+                        Connect {display_name}
+                    </button>
+                </form>
+                
+                <div class="footer">
+                    Powered by ModuleX • Secure Authentication System
+                </div>
+            </div>
+            
+            <script>
+                document.getElementById('auth-form').addEventListener('submit', async function(e) {{
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    const errorDiv = document.getElementById('error-message');
+                    
+                    try {{
+                        const response = await fetch(this.action, {{
+                            method: 'POST',
+                            body: formData
+                        }});
+                        
+                        if (response.ok) {{
+                            // Success - show success page or redirect to callback
+                            window.location.href = '/auth/callback/form/{tool_name}?user_id={user_id}';
+                        }} else {{
+                            const errorText = await response.text();
+                            errorDiv.textContent = 'Authentication failed. Please check your credentials.';
+                            errorDiv.style.display = 'block';
+                        }}
+                    }} catch (error) {{
+                        errorDiv.textContent = 'Connection error. Please try again.';
+                        errorDiv.style.display = 'block';
+                    }}
+                }});
+            </script>
+        </body>
+        </html>
+        """
+
     async def get_all_tools_with_user_status(self, user_id: str, detail: bool = False):
         """Get all available tools with user authentication and active status"""
         # Import here to avoid circular import

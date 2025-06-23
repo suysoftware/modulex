@@ -81,6 +81,9 @@ async def root():
             "auth": {
                 "get_auth_url": "/auth/url/{tool_name}?user_id=YOUR_USER_ID",
                 "callback": "/auth/callback/{tool_name}",
+                "form_callback": "/auth/callback/form/{tool_name}?user_id=YOUR_USER_ID",
+                "auth_form": "/auth/form/{tool_name}?user_id=YOUR_USER_ID",
+                "manual_auth": "/auth/manual",
                 "list_user_tools": "/auth/tools?user_id=YOUR_USER_ID",
                 "set_tool_status": "/auth/tools/{tool_name}/status?user_id=YOUR_USER_ID",
                 "set_action_status": "/auth/tools/{tool_name}/actions/{action_name}/status?user_id=YOUR_USER_ID",
