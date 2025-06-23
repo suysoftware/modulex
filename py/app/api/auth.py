@@ -573,13 +573,11 @@ async def auth_form(
 @callback_router.post("/form/{tool_name}", response_class=HTMLResponse)
 async def handle_auth_form_submit(
     tool_name: str,
-    user_id: str = Query(...),
     request: Request,
+    user_id: str = Query(...),
     db: AsyncSession = Depends(get_db)
 ):
     """Handle form submission for tools that require manual credential input"""
-    from fastapi import Request
-    
     auth_service = AuthService(db)
     
     try:
