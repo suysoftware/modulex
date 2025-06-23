@@ -7,19 +7,17 @@
     "requires_auth": true,
     "auth_type": "api_key",
     "setup_environment_variables": [
-    ],
-    "environment_variables": [
         {
-            "name": "base_url",
+            "name": "N8N_BASE_URL",
             "description": "N8N Instance Base URL",
-            "required": true,
-            "example": "https://your-n8n-instance.com"
+            "sample_format": "https://your-n8n-instance.com",
+            "about_url": "https://docs.n8n.io/hosting/"
         },
         {
-            "name": "api_key",
+            "name": "N8N_API_KEY",
             "description": "N8N API Key",
-            "required": true,
-            "example": "n8n_api_xxxxxxxxxxxxxxxx"
+            "sample_format": "n8n_api_xxxxxxxxxxxxxxxx",
+            "about_url": "https://docs.n8n.io/api/"
         }
     ],
     "actions": [

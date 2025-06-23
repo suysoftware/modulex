@@ -10,12 +10,14 @@
       {
         "name": "GITHUB_CLIENT_ID",
         "description": "GitHub client ID",
-        "sample_format": "ghp_1234567890"
+        "sample_format": "ghp_1234567890",
+        "about_url": "https://github.com/settings/applications/new"
       },
       {
         "name": "GITHUB_CLIENT_SECRET",
         "description": "GitHub client secret",
-        "sample_format": "ghs_1234567890"
+        "sample_format": "ghs_1234567890",
+        "about_url": "https://github.com/settings/applications/new"
       }
     ],
     "actions": [

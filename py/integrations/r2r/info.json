@@ -10,12 +10,14 @@
       {
         "name": "R2R_API_BASE",
         "description": "R2R API base URL",
-        "sample_format": "https://r2r.example.com"
+        "sample_format": "https://r2r.example.com",
+        "about_url": "https://docs.sciphi.ai/r2r/getting-started/quick-start"
       },
       {
         "name": "R2R_API_KEY",
         "description": "R2R API key",
-        "sample_format": "sk-1234567890"
+        "sample_format": "sk-1234567890",
+        "about_url": "https://docs.sciphi.ai/r2r/getting-started/quick-start"
       }
     ],
     "actions": [

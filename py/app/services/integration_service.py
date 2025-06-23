@@ -69,7 +69,8 @@ class IntegrationService:
                         env_vars.append({
                             "name": env_var["name"],
                             "description": env_var.get("description", ""),
-                            "sample_format": env_var.get("sample_format", "")
+                            "sample_format": env_var.get("sample_format", ""),
+                            "about_url": env_var.get("about_url", "")
                         })
                 
                 tool_data = {

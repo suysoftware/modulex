@@ -10,12 +10,14 @@
         {
             "name": "REDDIT_CLIENT_ID",
             "description": "Reddit application client ID",
-            "sample_format": "your_client_id_here"
+            "sample_format": "your_client_id_here",
+            "about_url": "https://www.reddit.com/prefs/apps"
         },
         {
             "name": "REDDIT_CLIENT_SECRET",
             "description": "Reddit application client secret",
-            "sample_format": "your_client_secret_here"
+            "sample_format": "your_client_secret_here",
+            "about_url": "https://www.reddit.com/prefs/apps"
         }
     ],
     "actions": [
