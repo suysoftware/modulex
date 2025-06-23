@@ -185,24 +185,48 @@ class AuthService:
         
         headers = {"Accept": "application/json"}
         
+        # Reddit requires Basic Auth for token exchange
+        if tool_name == "reddit":
+            import base64
+            auth_string = f"{config['client_id']}:{config['client_secret']}"
+            auth_bytes = base64.b64encode(auth_string.encode()).decode()
+            headers["Authorization"] = f"Basic {auth_bytes}"
+            headers["User-Agent"] = "ModuleX/1.0"
+            
+            # Reddit doesn't need client_id/client_secret in body when using Basic Auth
+            data = {
+                "code": code,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code"
+            }
+        
         async with httpx.AsyncClient() as client:
-            response = await client.post(config["token_url"], data=data, headers=headers)
-            response.raise_for_status()
-            token_data = response.json()
-            
-            # Check if response contains an error instead of access token
-            if "error" in token_data:
-                error_msg = f"OAuth error: {token_data.get('error')} - {token_data.get('error_description', 'No description')}"
-                print(f"💥 DEBUG: OAuth token exchange failed: {error_msg}")
-                raise ValueError(error_msg)
-            
-            # Verify that we got an access token
-            if "access_token" not in token_data:
-                print(f"💥 DEBUG: No access_token in response: {list(token_data.keys())}")
-                raise ValueError("No access_token received from OAuth provider")
+            try:
+                response = await client.post(config["token_url"], data=data, headers=headers)
+                print(f"🔍 DEBUG: {tool_name} token response status: {response.status_code}")
+                print(f"🔍 DEBUG: {tool_name} token response headers: {dict(response.headers)}")
                 
-            print(f"✅ DEBUG: OAuth token exchange successful, got keys: {list(token_data.keys())}")
-            return token_data
+                response.raise_for_status()
+                token_data = response.json()
+                
+                # Check if response contains an error instead of access token
+                if "error" in token_data:
+                    error_msg = f"OAuth error: {token_data.get('error')} - {token_data.get('error_description', 'No description')}"
+                    print(f"💥 DEBUG: OAuth token exchange failed: {error_msg}")
+                    raise ValueError(error_msg)
+                
+                # Verify that we got an access token
+                if "access_token" not in token_data:
+                    print(f"💥 DEBUG: No access_token in response: {list(token_data.keys())}")
+                    raise ValueError("No access_token received from OAuth provider")
+                    
+                print(f"✅ DEBUG: OAuth token exchange successful, got keys: {list(token_data.keys())}")
+                return token_data
+                
+            except httpx.HTTPStatusError as e:
+                print(f"💥 DEBUG: HTTP error during token exchange: {e.response.status_code}")
+                print(f"💥 DEBUG: Response text: {e.response.text}")
+                raise ValueError(f"HTTP {e.response.status_code}: {e.response.text}")
     
     async def _save_credentials(self, user: User, tool_name: str, token_data: Dict[str, Any]):
         """Save encrypted credentials to database"""
