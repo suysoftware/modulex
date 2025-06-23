@@ -327,46 +327,22 @@ def get_user_info(parameters: Dict[str, Any], user_credentials: Optional[Dict[st
         
         # Check if we have required credentials
         if not user_credentials:
-            return {
-                "success": False,
-                "error": "No user credentials provided",
-                "error_code": "NO_CREDENTIALS"
-            }
+            raise ValueError("No user credentials provided - NO_CREDENTIALS")
         
         access_token = user_credentials.get("access_token")
         if not access_token:
-            return {
-                "success": False,
-                "error": "No access token found in credentials. Please re-authenticate with Reddit.",
-                "error_code": "NO_ACCESS_TOKEN",
-                "available_keys": list(user_credentials.keys())
-            }
+            raise ValueError(f"No access token found in credentials. Please re-authenticate with Reddit. Available keys: {list(user_credentials.keys())}")
         
         # Test if token is still valid by making API call
         try:
             user_data = make_reddit_api_call("/api/v1/me", user_credentials=user_credentials)
         except requests.exceptions.HTTPError as http_err:
             if http_err.response.status_code == 401:
-                return {
-                    "success": False,
-                    "error": "Access token is expired or invalid. Please re-authenticate with Reddit.",
-                    "error_code": "INVALID_TOKEN",
-                    "status_code": 401
-                }
+                raise ValueError("Access token is expired or invalid. Please re-authenticate with Reddit. - INVALID_TOKEN")
             elif http_err.response.status_code == 403:
-                return {
-                    "success": False,
-                    "error": "Access denied. Check Reddit app permissions.",
-                    "error_code": "ACCESS_DENIED",
-                    "status_code": 403
-                }
+                raise ValueError("Access denied. Check Reddit app permissions. - ACCESS_DENIED")
             else:
-                return {
-                    "success": False,
-                    "error": f"Reddit API error: {http_err.response.status_code} - {http_err.response.text}",
-                    "error_code": "API_ERROR",
-                    "status_code": http_err.response.status_code
-                }
+                raise ValueError(f"Reddit API error: {http_err.response.status_code} - {http_err.response.text} - API_ERROR")
         
         return {
             "success": True,
@@ -384,11 +360,7 @@ def get_user_info(parameters: Dict[str, Any], user_credentials: Optional[Dict[st
         
     except Exception as e:
         print(f"💥 DEBUG get_user_info exception: {str(e)}")
-        return {
-            "success": False,
-            "error": f"Failed to get user info: {str(e)}",
-            "error_code": "GENERAL_ERROR"
-        }
+        raise ValueError(f"Failed to get user info: {str(e)}")
 
 
 def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
