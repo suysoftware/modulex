@@ -1,0 +1,208 @@
+{
+    "name": "reddit",
+    "display_name": "Reddit",
+    "description": "Reddit API integration for posts, comments, subreddits and search functionality",
+    "version": "1.0.0",
+    "author": "ModuleX",
+    "requires_auth": true,
+    "auth_type": "oauth2",
+    "setup_environment_variables": [
+        {
+            "name": "REDDIT_CLIENT_ID",
+            "description": "Reddit application client ID",
+            "sample_format": "your_client_id_here"
+        },
+        {
+            "name": "REDDIT_CLIENT_SECRET",
+            "description": "Reddit application client secret",
+            "sample_format": "your_client_secret_here"
+        }
+    ],
+    "actions": [
+        {
+            "name": "get_comments_by_submission",
+            "description": "Retrieve comments from a specific Reddit submission",
+            "parameters": {
+                "submission_id": {
+                    "type": "string",
+                    "description": "ID of the submission to get comments from",
+                    "required": true
+                },
+                "replace_more": {
+                    "type": "boolean",
+                    "description": "Whether to replace MoreComments objects with actual comments",
+                    "default": true,
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "get_comment_by_id",
+            "description": "Retrieve a specific comment by its ID",
+            "parameters": {
+                "comment_id": {
+                    "type": "string",
+                    "description": "ID of the comment to retrieve",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "get_submission",
+            "description": "Retrieve a specific submission by its ID",
+            "parameters": {
+                "submission_id": {
+                    "type": "string",
+                    "description": "ID of the submission to retrieve",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "get_subreddit",
+            "description": "Retrieve information about a specific subreddit",
+            "parameters": {
+                "subreddit_name": {
+                    "type": "string",
+                    "description": "Name of the subreddit to retrieve",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "search_posts",
+            "description": "Search for posts within a specific subreddit",
+            "parameters": {
+                "subreddit_name": {
+                    "type": "string",
+                    "description": "Name of the subreddit to search in",
+                    "required": true
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Search query string",
+                    "required": true
+                },
+                "sort": {
+                    "type": "string",
+                    "description": "How to sort the results",
+                    "default": "relevance",
+                    "optional": true
+                },
+                "syntax": {
+                    "type": "string",
+                    "description": "Query syntax to use",
+                    "default": "lucene",
+                    "optional": true
+                },
+                "time_filter": {
+                    "type": "string",
+                    "description": "Time period to limit results to",
+                    "default": "all",
+                    "optional": true
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of posts to return",
+                    "default": 25,
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "search_subreddits",
+            "description": "Search for subreddits using either name-based or description-based search",
+            "parameters": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query string",
+                    "required": true
+                },
+                "search_type": {
+                    "type": "string",
+                    "description": "Type of search: 'name' or 'description'",
+                    "default": "name",
+                    "optional": true
+                },
+                "include_nsfw": {
+                    "type": "boolean",
+                    "description": "Whether to include NSFW subreddits in search results (for name search)",
+                    "default": false,
+                    "optional": true
+                },
+                "exact_match": {
+                    "type": "boolean",
+                    "description": "If true, only return exact name matches (for name search)",
+                    "default": false,
+                    "optional": true
+                },
+                "include_full_description": {
+                    "type": "boolean",
+                    "description": "Whether to include the full subreddit description in results",
+                    "default": false,
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "get_user_info",
+            "description": "Get authenticated user information",
+            "parameters": {}
+        },
+        {
+            "name": "create_post",
+            "description": "Create a new post in a subreddit",
+            "parameters": {
+                "subreddit": {
+                    "type": "string",
+                    "description": "Name of the subreddit to post in",
+                    "required": true
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Title of the post",
+                    "required": true
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Content of the post (text content or URL for link posts)",
+                    "optional": true
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Type of post: 'text' or 'link'",
+                    "default": "text",
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "vote_post",
+            "description": "Vote on a Reddit post",
+            "parameters": {
+                "submission_id": {
+                    "type": "string",
+                    "description": "ID of the submission to vote on",
+                    "required": true
+                },
+                "direction": {
+                    "type": "string",
+                    "description": "Vote direction: 'up', 'down', or 'clear'",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "get_saved_posts",
+            "description": "Get user's saved posts and comments",
+            "parameters": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of saved items to return",
+                    "default": 25,
+                    "optional": true
+                }
+            }
+        }
+    ]
+}

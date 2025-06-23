@@ -27,6 +27,13 @@ class AuthService:
             "client_id": settings.GITHUB_CLIENT_ID,
             "client_secret": settings.GITHUB_CLIENT_SECRET,
         },
+        "reddit": {
+            "auth_url": "https://www.reddit.com/api/v1/authorize",
+            "token_url": "https://www.reddit.com/api/v1/access_token",
+            "scopes": ["identity", "read", "submit", "vote", "save"],
+            "client_id": settings.REDDIT_CLIENT_ID,
+            "client_secret": settings.REDDIT_CLIENT_SECRET,
+        },
         "google": {
             "auth_url": "https://accounts.google.com/o/oauth2/auth", 
             "token_url": "https://oauth2.googleapis.com/token",
