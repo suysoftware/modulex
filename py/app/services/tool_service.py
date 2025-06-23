@@ -115,24 +115,57 @@ class ToolService:
                         # Success
                         try:
                             output = json.loads(stdout.decode())
+                            
+                            # Check if tool returned an error within the JSON response
+                            if isinstance(output, dict) and output.get("success") is False:
+                                logger.warning(f"Tool {tool_name}/{action} returned error: {output.get('error', 'Unknown error')}")
+                                return {
+                                    "success": False,
+                                    "error": output.get("error", "Tool returned error"),
+                                    "error_code": output.get("error_code", "TOOL_ERROR"),
+                                    "tool_name": tool_name,
+                                    "action": action,
+                                    "debug_info": output
+                                }
+                            
                             return {
                                 "success": True,
                                 "result": output,
                                 "tool_name": tool_name,
                                 "action": action
                             }
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError as e:
+                            logger.error(f"JSON decode error for {tool_name}/{action}: {str(e)}")
+                            logger.error(f"Raw stdout: {stdout.decode()}")
                             return {
-                                "success": True,
-                                "result": stdout.decode(),
+                                "success": False,
+                                "error": f"Tool output parsing error: {str(e)}",
+                                "raw_output": stdout.decode(),
                                 "tool_name": tool_name,
                                 "action": action
                             }
                     else:
                         # Error
+                        stderr_text = stderr.decode()
+                        stdout_text = stdout.decode()
+                        
+                        logger.error(f"Tool {tool_name}/{action} failed with exit code {result.returncode}")
+                        logger.error(f"Stderr: {stderr_text}")
+                        logger.error(f"Stdout: {stdout_text}")
+                        
+                        # Try to parse stdout as JSON to get structured error
+                        error_msg = stderr_text or stdout_text
+                        try:
+                            error_json = json.loads(stdout_text) if stdout_text else {}
+                            if isinstance(error_json, dict) and "error" in error_json:
+                                error_msg = error_json["error"]
+                        except json.JSONDecodeError:
+                            pass
+                        
                         return {
                             "success": False,
-                            "error": stderr.decode() or stdout.decode(),
+                            "error": error_msg,
+                            "exit_code": result.returncode,
                             "tool_name": tool_name,
                             "action": action
                         }
