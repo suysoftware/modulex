@@ -1,9 +1,10 @@
 """
-Authentication Service - Simplified
+Authentication Service with OAuth2 and Manual Auth Support
 """
 import secrets
 import httpx
 import json
+import jwt
 from typing import Tuple, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -13,51 +14,20 @@ from ..models.user import User, UserToolAuth
 from ..core.config import settings
 from ..core.encryption import encrypt_credentials, decrypt_credentials
 from ..core.database import redis_client
+from .auth_handlers.oauth_handler_factory import OAuthHandlerFactory
+from .auth_handlers.manual_auth_factory import ManualAuthHandlerFactory
+from .integration_service import IntegrationService
 
 
 class AuthService:
     """Simple authentication service"""
-    
-    # OAuth configurations
-    OAUTH_CONFIGS = {
-        "github": {
-            "auth_url": "https://github.com/login/oauth/authorize",
-            "token_url": "https://github.com/login/oauth/access_token",
-            "scopes": ["repo", "user"],
-            "client_id": settings.GITHUB_CLIENT_ID,
-            "client_secret": settings.GITHUB_CLIENT_SECRET,
-        },
-        "reddit": {
-            "auth_url": "https://www.reddit.com/api/v1/authorize",
-            "token_url": "https://www.reddit.com/api/v1/access_token",
-            "scopes": ["identity", "read", "submit", "vote", "save"],
-            "client_id": settings.REDDIT_CLIENT_ID,
-            "client_secret": settings.REDDIT_CLIENT_SECRET,
-        },
-        "google": {
-            "auth_url": "https://accounts.google.com/o/oauth2/auth", 
-            "token_url": "https://oauth2.googleapis.com/token",
-            "scopes": ["openid", "email", "profile"],
-            "client_id": settings.GOOGLE_CLIENT_ID,
-            "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        },
-        "slack": {
-            "auth_url": "https://slack.com/oauth/v2/authorize",
-            "token_url": "https://slack.com/api/oauth.v2.access",
-            "scopes": ["chat:write", "channels:read"],
-            "client_id": settings.SLACK_CLIENT_ID,
-            "client_secret": settings.SLACK_CLIENT_SECRET,
-        },
-        "r2r":{
-            "auth_url": settings.R2R_AUTH_URL,
-        }
-    }
     
     def __init__(self, db: AsyncSession):
         self.db = db
         self.redis = redis_client
         self.oauth_state_prefix = "oauth_state:"  # Redis key prefix for namespacing
         self.oauth_state_ttl = 600  # 10 minutes TTL for security
+        self.integration_service = IntegrationService()
     
     async def register_manual_auth(self, user_id: str, tool_name: str, credentials: Dict[str, Any]) -> bool:
         """Register credentials manually for any tool (no OAuth flow needed)"""
@@ -99,10 +69,14 @@ class AuthService:
     
     async def generate_auth_url(self, user_id: str, tool_name: str) -> Tuple[str, str]:
         """Generate OAuth authorization URL"""
-        if tool_name not in self.OAUTH_CONFIGS:
+        # Check if tool is supported by our handler factory
+        if not OAuthHandlerFactory.is_supported(tool_name):
             raise ValueError(f"Tool {tool_name} not supported")
         
-        config = self.OAUTH_CONFIGS[tool_name]
+        # Get credentials and create handler
+        client_id, client_secret = self._get_oauth_credentials(tool_name)
+        handler = OAuthHandlerFactory.get_handler(tool_name, client_id, client_secret)
+        
         state = secrets.token_urlsafe(32)
         
         # Store state in Redis with TTL for security
@@ -119,19 +93,9 @@ class AuthService:
             json.dumps(state_data)
         )
         
-        # Build redirect URI
+        # Build redirect URI and authorization URL using handler
         redirect_uri = f"{settings.BASE_URL}/auth/callback/{tool_name}"
-        
-        # Build authorization URL
-        scopes_str = " ".join(config["scopes"])
-        auth_url = (
-            f"{config['auth_url']}"
-            f"?client_id={config['client_id']}"
-            f"&redirect_uri={redirect_uri}"
-            f"&scope={scopes_str}"
-            f"&state={state}"
-            f"&response_type=code"
-        )
+        auth_url = handler.build_auth_url(redirect_uri, state)
         
         return auth_url, state
     
@@ -157,9 +121,11 @@ class AuthService:
         
         user_id = state_data["user_id"]
         
-        # Exchange code for token
-        config = self.OAUTH_CONFIGS[tool_name]
-        token_data = await self._exchange_code_for_token(tool_name, code)
+        # Exchange code for token using handler
+        client_id, client_secret = self._get_oauth_credentials(tool_name)
+        handler = OAuthHandlerFactory.get_handler(tool_name, client_id, client_secret)
+        redirect_uri = f"{settings.BASE_URL}/auth/callback/{tool_name}"
+        token_data = await handler.exchange_code_for_token(code, redirect_uri)
         
         # Save credentials
         user = await self.get_or_create_user(user_id)
@@ -169,64 +135,6 @@ class AuthService:
         await self.redis.delete(redis_key)
         
         return True
-    
-    async def _exchange_code_for_token(self, tool_name: str, code: str) -> Dict[str, Any]:
-        """Exchange authorization code for access token"""
-        config = self.OAUTH_CONFIGS[tool_name]
-        redirect_uri = f"{settings.BASE_URL}/auth/callback/{tool_name}"
-        
-        data = {
-            "client_id": config["client_id"],
-            "client_secret": config["client_secret"],
-            "code": code,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code"
-        }
-        
-        headers = {"Accept": "application/json"}
-        
-        # Reddit requires Basic Auth for token exchange
-        if tool_name == "reddit":
-            import base64
-            auth_string = f"{config['client_id']}:{config['client_secret']}"
-            auth_bytes = base64.b64encode(auth_string.encode()).decode()
-            headers["Authorization"] = f"Basic {auth_bytes}"
-            headers["User-Agent"] = "ModuleX/1.0"
-            
-            # Reddit doesn't need client_id/client_secret in body when using Basic Auth
-            data = {
-                "code": code,
-                "redirect_uri": redirect_uri,
-                "grant_type": "authorization_code"
-            }
-        
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(config["token_url"], data=data, headers=headers)
-                print(f"🔍 DEBUG: {tool_name} token response status: {response.status_code}")
-                print(f"🔍 DEBUG: {tool_name} token response headers: {dict(response.headers)}")
-                
-                response.raise_for_status()
-                token_data = response.json()
-                
-                # Check if response contains an error instead of access token
-                if "error" in token_data:
-                    error_msg = f"OAuth error: {token_data.get('error')} - {token_data.get('error_description', 'No description')}"
-                    print(f"💥 DEBUG: OAuth token exchange failed: {error_msg}")
-                    raise ValueError(error_msg)
-                
-                # Verify that we got an access token
-                if "access_token" not in token_data:
-                    print(f"💥 DEBUG: No access_token in response: {list(token_data.keys())}")
-                    raise ValueError("No access_token received from OAuth provider")
-                    
-                print(f"✅ DEBUG: OAuth token exchange successful, got keys: {list(token_data.keys())}")
-                return token_data
-                
-            except httpx.HTTPStatusError as e:
-                print(f"💥 DEBUG: HTTP error during token exchange: {e.response.status_code}")
-                print(f"💥 DEBUG: Response text: {e.response.text}")
-                raise ValueError(f"HTTP {e.response.status_code}: {e.response.text}")
     
     async def _save_credentials(self, user: User, tool_name: str, token_data: Dict[str, Any]):
         """Save encrypted credentials to database"""
@@ -505,19 +413,21 @@ class AuthService:
 
     async def handle_manual_auth_url(self, user_id: str, tool_name: str) -> Dict[str, Any]:
         """Handle auth URL request for manual auth tools"""
-        if tool_name not in self.OAUTH_CONFIGS:
-            raise ValueError(f"Tool {tool_name} not configured in OAUTH_CONFIGS")
+        # Check if tool is supported by manual auth factory
+        if not ManualAuthHandlerFactory.is_supported(tool_name):
+            raise ValueError(f"Tool {tool_name} not supported for manual auth")
         
-        config = self.OAUTH_CONFIGS[tool_name]
-        auth_url = config.get("auth_url")
-        
-        if not auth_url:
-            raise ValueError(f"No auth_url configured for tool {tool_name}")
+        # Get configuration and create handler
+        config = self._get_manual_auth_config(tool_name)
+        handler = ManualAuthHandlerFactory.get_handler(tool_name, **config)
         
         try:
-            # Make GET request to auth_url with user_id parameter
+            # Get auth URL from handler
+            auth_url = await handler.get_auth_url(user_id)
+            
+            # Make GET request to auth_url
             async with httpx.AsyncClient() as client:
-                response = await client.get(auth_url, params={"user_id": user_id})
+                response = await client.get(auth_url)
                 response.raise_for_status()
                 
                 # Get response data
@@ -527,23 +437,19 @@ class AuthService:
                     # If not JSON, treat as text response
                     auth_data = {"response": response.text}
                 
-                # Automatically start handle_callback process
-                success = await self.handle_manual_callback(tool_name, user_id, auth_data)
+                # Process auth response using handler
+                credentials = await handler.process_auth_response(auth_data, user_id)
                 
-                if success:
-                    return {
-                        "success": True,
-                        "message": f"Manual authentication completed for {tool_name}",
-                        "tool_name": tool_name,
-                        "user_id": user_id
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "error": "Manual authentication callback failed",
-                        "tool_name": tool_name,
-                        "user_id": user_id
-                    }
+                # Save credentials
+                user = await self.get_or_create_user(user_id)
+                await self._save_credentials(user, tool_name, credentials)
+                
+                return {
+                    "success": True,
+                    "message": f"Manual authentication completed for {tool_name}",
+                    "tool_name": tool_name,
+                    "user_id": user_id
+                }
                     
         except httpx.RequestError as e:
             raise ValueError(f"Failed to connect to auth URL: {str(e)}")
@@ -960,4 +866,401 @@ class AuthService:
             
             tools_with_status.append(tool_response)
         
-        return tools_with_status 
+        return tools_with_status
+
+    async def initiate_auth(self, user_id: str, tool_name: str) -> Dict[str, Any]:
+        """Initiate authentication flow for a tool"""
+        try:
+            # Get tool info to determine auth type
+            tool_info = await self.integration_service.get_integration_info(tool_name)
+            auth_type = tool_info.get("auth_type", "oauth2")
+            
+            if auth_type == "oauth2":
+                return await self._initiate_oauth(user_id, tool_name)
+            elif auth_type == "manual":
+                return await self._initiate_manual_auth(user_id, tool_name)
+            else:
+                raise ValueError(f"Unsupported auth type: {auth_type}")
+                
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _initiate_oauth(self, user_id: str, tool_name: str) -> Dict[str, Any]:
+        """Initiate OAuth2 flow"""
+        try:
+            handler = OAuthHandlerFactory.get_handler(tool_name)
+            
+            state_token = self._generate_state_token(user_id, tool_name)
+            auth_url = await handler.get_auth_url(state_token)
+            
+            return {
+                "auth_url": auth_url,
+                "state": state_token,
+                "message": f"Redirecting to {tool_name} for authorization..."
+            }
+            
+        except Exception as e:
+            return {"error": f"OAuth initiation failed: {str(e)}"}
+    
+    async def _initiate_manual_auth(self, user_id: str, tool_name: str) -> Dict[str, Any]:
+        """Initiate manual authentication flow"""
+        try:
+            handler = ManualAuthHandlerFactory.get_handler(tool_name)
+            auth_url = await handler.get_auth_url(user_id)
+            
+            return {
+                "auth_url": auth_url,
+                "message": f"Please visit the URL to configure {tool_name} authentication"
+            }
+            
+        except Exception as e:
+            return {"error": f"Manual auth initiation failed: {str(e)}"}
+    
+    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+        """Handle OAuth2 callback"""
+        try:
+            # Decode state token
+            state_data = self._decode_state_token(state)
+            user_id = state_data["user_id"]
+            tool_name = state_data["tool_name"]
+            
+            # Get handler and exchange code for token
+            handler = OAuthHandlerFactory.get_handler(tool_name)
+            credentials = await handler.exchange_code_for_token(code, state)
+            
+            # Store credentials
+            await self._store_credentials(user_id, tool_name, credentials)
+            
+            return {
+                "success": True,
+                "message": f"{tool_name} authentication successful"
+            }
+            
+        except Exception as e:
+            return {"error": f"OAuth callback failed: {str(e)}"}
+    
+    async def handle_manual_auth(self, user_id: str, tool_name: str, auth_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle manual authentication submission"""
+        try:
+            handler = ManualAuthHandlerFactory.get_handler(tool_name)
+            credentials = await handler.process_auth_response(auth_data, user_id)
+            
+            # Store credentials
+            await self._store_credentials(user_id, tool_name, credentials)
+            
+            return {
+                "success": True,
+                "message": f"{tool_name} authentication successful"
+            }
+            
+        except Exception as e:
+            return {"error": f"Manual auth failed: {str(e)}"}
+    
+    def _generate_state_token(self, user_id: str, tool_name: str) -> str:
+        """Generate JWT state token for OAuth2"""
+        payload = {
+            "user_id": user_id,
+            "tool_name": tool_name,
+            "timestamp": datetime.utcnow().isoformat(),
+            "exp": datetime.utcnow() + timedelta(minutes=10)
+        }
+        return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+    
+    def _decode_state_token(self, token: str) -> Dict[str, Any]:
+        """Decode and validate state token"""
+        try:
+            return jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            raise ValueError("State token has expired")
+        except jwt.InvalidTokenError:
+            raise ValueError("Invalid state token")
+    
+    async def _store_credentials(self, user_id: str, tool_name: str, credentials: Dict[str, Any]):
+        """Store authentication credentials"""
+        # Implementation depends on your database setup
+        # This is a placeholder
+        print(f"Storing credentials for user {user_id}, tool {tool_name}")
+        print(f"Credentials: {credentials}")
+    
+    async def get_credentials(self, user_id: str, tool_name: str) -> Optional[Dict[str, Any]]:
+        """Get stored credentials for a user and tool"""
+        # Implementation depends on your database setup
+        # This is a placeholder
+        return None
+    
+    async def revoke_credentials(self, user_id: str, tool_name: str) -> bool:
+        """Revoke stored credentials"""
+        # Implementation depends on your database setup
+        # This is a placeholder
+        return True
+
+    def _get_oauth_credentials(self, tool_name: str) -> Tuple[str, str]:
+        """Get OAuth credentials for a tool from settings"""
+        credentials_map = {
+            "github": (settings.GITHUB_CLIENT_ID, settings.GITHUB_CLIENT_SECRET),
+            "reddit": (settings.REDDIT_CLIENT_ID, settings.REDDIT_CLIENT_SECRET),
+            "google": (settings.GOOGLE_CLIENT_ID, settings.GOOGLE_CLIENT_SECRET),
+            "slack": (settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
+        }
+        
+        if tool_name not in credentials_map:
+            raise ValueError(f"No credentials configured for tool: {tool_name}")
+        
+        client_id, client_secret = credentials_map[tool_name]
+        if not client_id or not client_secret:
+            raise ValueError(f"Missing credentials for tool: {tool_name}")
+        
+        return client_id, client_secret
+    
+    def _get_manual_auth_config(self, tool_name: str) -> Dict[str, str]:
+        """Get manual auth configuration for a tool"""
+        if tool_name == "r2r":
+            return {
+                "auth_url": settings.R2R_AUTH_URL
+            }
+        else:
+            raise ValueError(f"No manual auth configuration for tool: {tool_name}")
+
+    def _generate_form_html(self, tool_name: str, user_id: str, required_fields: list) -> str:
+        """Generate beautiful form HTML"""
+        tool_display_names = {
+            "n8n": "N8N Workflow Automation",
+            "api_key": "API Key Authentication",
+        }
+        
+        display_name = tool_display_names.get(tool_name, tool_name.title())
+        
+        # Generate form fields
+        form_fields = ""
+        for field in required_fields:
+            field_name = field["name"]
+            field_type = field["type"]
+            field_desc = field["description"]
+            is_required = field["required"]
+            
+            form_fields += f"""
+                <div class="form-group">
+                    <label for="{field_name}" class="form-label">
+                        {field_desc}
+                        {' <span class="required">*</span>' if is_required else ''}
+                    </label>
+                    <input 
+                        type="{field_type}" 
+                        id="{field_name}" 
+                        name="{field_name}" 
+                        class="form-input" 
+                        placeholder="Enter your {field_desc.lower()}"
+                        {'required' if is_required else ''}
+                    />
+                </div>
+            """
+        
+        return f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Connect {display_name} - ModuleX</title>
+            <style>
+                * {{
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }}
+                
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                    min-height: 100vh;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }}
+                
+                .container {{
+                    background: white;
+                    border-radius: 16px;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                    padding: 40px;
+                    max-width: 500px;
+                    width: 100%;
+                    animation: slideUp 0.6s ease-out;
+                }}
+                
+                @keyframes slideUp {{
+                    from {{
+                        opacity: 0;
+                        transform: translateY(30px);
+                    }}
+                    to {{
+                        opacity: 1;
+                        transform: translateY(0);
+                    }}
+                }}
+                
+                .header {{
+                    text-align: center;
+                    margin-bottom: 32px;
+                }}
+                
+                .tool-icon {{
+                    width: 64px;
+                    height: 64px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 12px;
+                    margin: 0 auto 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 28px;
+                    font-weight: bold;
+                }}
+                
+                .title {{
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: #1f2937;
+                    margin-bottom: 8px;
+                }}
+                
+                .subtitle {{
+                    color: #6b7280;
+                    font-size: 14px;
+                    line-height: 1.5;
+                }}
+                
+                .form-group {{
+                    margin-bottom: 20px;
+                }}
+                
+                .form-label {{
+                    display: block;
+                    font-weight: 600;
+                    color: #374151;
+                    margin-bottom: 8px;
+                    font-size: 14px;
+                }}
+                
+                .required {{
+                    color: #ef4444;
+                }}
+                
+                .form-input {{
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                    background: #f9fafb;
+                }}
+                
+                .form-input:focus {{
+                    outline: none;
+                    border-color: #667eea;
+                    background: white;
+                    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                }}
+                
+                .submit-button {{
+                    width: 100%;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    padding: 14px 20px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    margin-top: 8px;
+                }}
+                
+                .submit-button:hover {{
+                    transform: translateY(-1px);
+                    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+                }}
+                
+                .submit-button:active {{
+                    transform: translateY(0);
+                }}
+                
+                .footer {{
+                    text-align: center;
+                    margin-top: 24px;
+                    font-size: 12px;
+                    color: #9CA3AF;
+                }}
+                
+                .error-message {{
+                    background: #fee2e2;
+                    color: #dc2626;
+                    padding: 12px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    font-size: 14px;
+                    display: none;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="tool-icon">
+                        {display_name[0]}
+                    </div>
+                    <h1 class="title">Connect {display_name}</h1>
+                    <p class="subtitle">
+                        Enter your {display_name} credentials to connect your account with ModuleX.
+                        This information will be securely encrypted and stored.
+                    </p>
+                </div>
+                
+                <div id="error-message" class="error-message"></div>
+                
+                <form id="auth-form" action="/auth/form/{tool_name}?user_id={user_id}" method="POST">
+                    {form_fields}
+                    
+                    <button type="submit" class="submit-button">
+                        Connect {display_name}
+                    </button>
+                </form>
+                
+                <div class="footer">
+                    Powered by ModuleX • Secure Authentication System
+                </div>
+            </div>
+            
+            <script>
+                document.getElementById('auth-form').addEventListener('submit', async function(e) {{
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    const errorDiv = document.getElementById('error-message');
+                    
+                    try {{
+                        const response = await fetch(this.action, {{
+                            method: 'POST',
+                            body: formData
+                        }});
+                        
+                        if (response.ok) {{
+                            // Success - show success page or redirect to callback
+                            window.location.href = '/auth/callback/form/{tool_name}?user_id={user_id}';
+                        }} else {{
+                            const errorText = await response.text();
+                            errorDiv.textContent = 'Authentication failed. Please check your credentials.';
+                            errorDiv.style.display = 'block';
+                        }}
+                    }} catch (error) {{
+                        errorDiv.textContent = 'Connection error. Please try again.';
+                        errorDiv.style.display = 'block';
+                    }}
+                }});
+            </script>
+        </body>
+        </html>
+        """ 
