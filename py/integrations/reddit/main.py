@@ -408,7 +408,7 @@ def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str,
         subreddit_obj = reddit.subreddit(subreddit)
         
         if post_type == "text":
-            submission = subreddit_obj.submit(title=title, selftext=content)
+            submission = subreddit_obj.submit(title=title, selftext=content or "")
         elif post_type == "link":
             if not content:
                 raise ValueError("URL is required for link posts")
