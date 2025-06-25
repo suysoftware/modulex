@@ -12,7 +12,13 @@ from typing import Dict, Any
 def get_auth_headers() -> Dict[str, str]:
     """Get GitHub API authentication headers"""
     access_token = os.getenv("ACCESS_TOKEN")
+    print(f"🔑 DEBUG [GitHub]: ACCESS_TOKEN from env: {'Found' if access_token else 'Not found'}")
+    if access_token:
+        print(f"🔑 DEBUG [GitHub]: ACCESS_TOKEN length: {len(access_token)}, starts with: {access_token[:10]}...")
+    
     if not access_token:
+        print(f"❌ DEBUG [GitHub]: ACCESS_TOKEN not found in environment variables")
+        print(f"🌍 DEBUG [GitHub]: Available env vars: {list(os.environ.keys())}")
         raise ValueError("ACCESS_TOKEN not found in environment")
     
     return {
@@ -26,13 +32,22 @@ def list_repositories(parameters: Dict[str, Any]) -> Dict[str, Any]:
     headers = get_auth_headers()
     per_page = parameters.get("per_page", 30)
     
+    print(f"📡 DEBUG [GitHub]: Making request to list repositories with per_page={per_page}")
+    print(f"🔐 DEBUG [GitHub]: Using Authorization header: {headers['Authorization'][:20]}...")
+    
     response = requests.get(
         f"https://api.github.com/user/repos?per_page={per_page}",
         headers=headers
     )
+    
+    print(f"📊 DEBUG [GitHub]: API Response status code: {response.status_code}")
+    if response.status_code != 200:
+        print(f"❌ DEBUG [GitHub]: API Error response: {response.text}")
+    
     response.raise_for_status()
     
     repos = response.json()
+    print(f"✅ DEBUG [GitHub]: Successfully retrieved {len(repos)} repositories")
     return {
         "repositories": [
             {
@@ -63,14 +78,24 @@ def create_repository(parameters: Dict[str, Any]) -> Dict[str, Any]:
         "private": parameters.get("private", False)
     }
     
+    print(f"📡 DEBUG [GitHub]: Making request to create repository '{name}'")
+    print(f"🔐 DEBUG [GitHub]: Using Authorization header: {headers['Authorization'][:20]}...")
+    print(f"📦 DEBUG [GitHub]: Repository data: {data}")
+    
     response = requests.post(
         "https://api.github.com/user/repos",
         headers=headers,
         json=data
     )
+    
+    print(f"📊 DEBUG [GitHub]: API Response status code: {response.status_code}")
+    if response.status_code != 201:
+        print(f"❌ DEBUG [GitHub]: API Error response: {response.text}")
+    
     response.raise_for_status()
     
     repo = response.json()
+    print(f"✅ DEBUG [GitHub]: Successfully created repository '{repo['name']}'")
     return {
         "repository": {
             "name": repo["name"],
@@ -87,10 +112,19 @@ def get_user_info(parameters: Dict[str, Any]) -> Dict[str, Any]:
     """Get user information"""
     headers = get_auth_headers()
     
+    print(f"📡 DEBUG [GitHub]: Making request to get user info")
+    print(f"🔐 DEBUG [GitHub]: Using Authorization header: {headers['Authorization'][:20]}...")
+    
     response = requests.get("https://api.github.com/user", headers=headers)
+    
+    print(f"📊 DEBUG [GitHub]: API Response status code: {response.status_code}")
+    if response.status_code != 200:
+        print(f"❌ DEBUG [GitHub]: API Error response: {response.text}")
+    
     response.raise_for_status()
     
     user = response.json()
+    print(f"✅ DEBUG [GitHub]: Successfully retrieved user info for '{user.get('login', 'unknown')}'")
     return {
         "user": {
             "login": user["login"],
@@ -114,6 +148,8 @@ def main():
         action = input_data.get("action")
         parameters = input_data.get("parameters", {})
         
+        print(f"🚀 DEBUG [GitHub]: Starting execution of action '{action}' with parameters: {parameters}")
+        
         # Execute action
         if action == "list_repositories":
             result = list_repositories(parameters)
@@ -124,10 +160,15 @@ def main():
         else:
             raise ValueError(f"Unknown action: {action}")
         
+        print(f"🎉 DEBUG [GitHub]: Action '{action}' completed successfully")
+        
         # Return result
         print(json.dumps(result))
         
     except Exception as e:
+        print(f"💥 DEBUG [GitHub]: Action failed with error: {str(e)}")
+        print(f"🔍 DEBUG [GitHub]: Error type: {type(e).__name__}")
+        
         # Return error
         error_result = {
             "error": str(e),

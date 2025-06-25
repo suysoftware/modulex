@@ -288,13 +288,29 @@ class AuthService:
             return None
         
         print(f"✅ DEBUG: Active auth record found for user_id={user_id}, tool_name={tool_name}")
+        print(f"🔐 DEBUG: Encrypted credentials (first 50 chars): {auth_record.encrypted_credentials[:50]}...")
+        print(f"📝 DEBUG: Auth record details - is_authenticated: {auth_record.is_authenticated}, is_active: {auth_record.is_active}")
         
         try:
+            print(f"🔓 DEBUG: Starting decryption for user.id={user.id}")
             decrypted_creds = decrypt_credentials(user.id, auth_record.encrypted_credentials)
-            print(f"🔓 DEBUG: Successfully decrypted credentials, keys: {list(decrypted_creds.keys())}")
+            print(f"✅ DEBUG: Successfully decrypted credentials, keys: {list(decrypted_creds.keys())}")
+            
+            # Log access_token existence and first few characters (for debugging)
+            if "access_token" in decrypted_creds:
+                access_token = decrypted_creds["access_token"]
+                print(f"🔑 DEBUG: access_token found, length: {len(access_token)}, starts with: {access_token[:10]}...")
+            else:
+                print(f"⚠️ DEBUG: No access_token found in decrypted credentials")
+                
+            # Log all credential keys (but not values for security)
+            print(f"🗝️ DEBUG: All credential keys: {list(decrypted_creds.keys())}")
+            
             return decrypted_creds
         except Exception as e:
             print(f"💥 DEBUG: Failed to decrypt credentials: {e}")
+            print(f"🔍 DEBUG: Encrypted data length: {len(auth_record.encrypted_credentials)}")
+            print(f"🔍 DEBUG: User ID type: {type(user.id)}, value: {user.id}")
             return None
     
     async def get_user_tools(self, user_id: str) -> list:
