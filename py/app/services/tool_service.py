@@ -210,8 +210,6 @@ class ToolService:
         # Debug logging only if enabled (prevents I/O overhead)
         debug_enabled = logger.isEnabledFor(logging.DEBUG)
         
-        print(f"🔧 DEBUG: Preparing tool env - input credentials keys: {list(credentials.keys())}")
-        
         if debug_enabled:
             logger.debug(f"Preparing env for credential keys: {list(credentials.keys())}")
         
@@ -219,16 +217,12 @@ class ToolService:
         access_token = credentials.get("access_token")
         if access_token:
             env["ACCESS_TOKEN"] = access_token
-            print(f"🔑 DEBUG: ACCESS_TOKEN set for env, length: {len(access_token)}, starts with: {access_token[:10]}...")
             if debug_enabled:
                 logger.debug("ACCESS_TOKEN configured")
-        else:
-            print(f"⚠️ DEBUG: No access_token found in credentials for environment")
         
         refresh_token = credentials.get("refresh_token")
         if refresh_token:
             env["REFRESH_TOKEN"] = refresh_token
-            print(f"🔄 DEBUG: REFRESH_TOKEN set for env, length: {len(refresh_token)}")
             if debug_enabled:
                 logger.debug("REFRESH_TOKEN configured")
         
@@ -240,9 +234,6 @@ class ToolService:
             if isinstance(value, str) and key not in excluded_keys
         }
         env.update(other_env_vars)
-        
-        print(f"🌍 DEBUG: Environment variables prepared: {list(env.keys())}")
-        print(f"🚫 DEBUG: Excluded keys: {list(excluded_keys)}")
         
         if debug_enabled:
             logger.debug(f"Environment prepared with {len(env)} variables")

@@ -30,75 +30,25 @@ router = APIRouter(prefix="/tools", tags=["Tools"])
 @router.post("/{tool_name}/execute")
 async def execute_tool(
     tool_name: str,
-    request: ToolExecutionRequest,
-    user: AuthResult = Depends(user_auth_required),
-    user_id: str = Query(None),
-    db: AsyncSession = Depends(get_db)
-):
-    """Execute a tool action - Auth required with user_id"""
-    
-    print(f"🚀 DEBUG [API]: Received request for tool '{tool_name}'")
-    print(f"👤 DEBUG [API]: User auth method: {user.auth_method}, user_id param: {user_id}")
-    print(f"📦 DEBUG [API]: Request body - action: {request.action}, parameters: {request.parameters}")
-    
-    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
-    effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
-    
-    print(f"🎯 DEBUG [API]: Effective user_id: {effective_user_id}")
-    
-    if not effective_user_id:
-        print(f"❌ DEBUG [API]: No effective user_id found")
-        raise HTTPException(status_code=400, detail="user_id is required")
-    
-    tool_service = ToolService(db)
-    
-    try:
-        print(f"⚡ DEBUG [API]: Starting tool execution: {tool_name}/{request.action}")
-        result = await tool_service.execute_tool_action(
-            user_id=effective_user_id,
-            tool_name=tool_name,
-            action_name=request.action,
-            parameters=request.parameters or {}
-        )
-        print(f"✅ DEBUG [API]: Tool execution completed successfully")
-        return result
-    except Exception as e:
-        print(f"💥 DEBUG [API]: Tool execution failed: {str(e)}")
-        print(f"🔍 DEBUG [API]: Exception type: {type(e).__name__}")
-        raise HTTPException(status_code=500, detail=f"Tool execution failed: {str(e)}")
-
-
-@router.post("/{tool_name}/debug-execute")
-async def debug_execute_tool(
-    tool_name: str,
     request_obj: Request,
     user: AuthResult = Depends(user_auth_required),
     user_id: str = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """Debug endpoint to see raw request body"""
+    """Execute a tool action - Auth required with user_id. Supports both legacy and new request formats."""
     
-    print(f"🔍 DEBUG [RAW]: Received debug request for tool '{tool_name}'")
-    print(f"👤 DEBUG [RAW]: User auth method: {user.auth_method}, user_id param: {user_id}")
+    # Get effective user_id: for X-API-KEY use parameter, for tokens use authenticated user_id
+    effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
+    
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
     
     try:
-        # Get raw body
+        # Get raw body to support both formats
         raw_body = await request_obj.body()
-        print(f"📦 DEBUG [RAW]: Raw request body: {raw_body}")
+        parsed_body = json.loads(raw_body)
         
-        # Try to parse as JSON
-        try:
-            parsed_body = json.loads(raw_body)
-            print(f"📊 DEBUG [RAW]: Parsed JSON: {parsed_body}")
-        except json.JSONDecodeError as e:
-            print(f"❌ DEBUG [RAW]: JSON parse error: {e}")
-            return {"error": "Invalid JSON", "raw_body": raw_body.decode()}
-        
-        # Get effective user_id
-        effective_user_id = user_id if user.auth_method == "x_api_key" else user.user_id
-        print(f"🎯 DEBUG [RAW]: Effective user_id: {effective_user_id}")
-        
-        # Try to extract action and parameters from different formats
+        # Extract action and parameters from either format
         action = None
         parameters = {}
         
@@ -106,36 +56,30 @@ async def debug_execute_tool(
             # Legacy format: {"action": "...", "parameters": {...}}
             action = parsed_body.get("action")
             parameters = parsed_body.get("parameters", {})
-            print(f"📝 DEBUG [RAW]: Legacy format detected - action: {action}, params: {parameters}")
         elif "parameters" in parsed_body and "action" in parsed_body.get("parameters", {}):
             # New format: {"parameters": {"action": "...", ...}}
-            parameters = parsed_body["parameters"]
+            parameters = parsed_body["parameters"].copy()
             action = parameters.pop("action", None)  # Remove action from parameters
-            print(f"📝 DEBUG [RAW]: New format detected - action: {action}, params: {parameters}")
         else:
-            print(f"❌ DEBUG [RAW]: Unknown request format")
-            return {"error": "Unknown request format", "parsed_body": parsed_body}
+            raise HTTPException(status_code=422, detail="Request must contain either 'action' field or 'action' within 'parameters'")
         
         if not action:
-            return {"error": "No action found in request", "parsed_body": parsed_body}
+            raise HTTPException(status_code=422, detail="Action is required")
         
-        # Execute the tool
         tool_service = ToolService(db)
         
-        print(f"⚡ DEBUG [RAW]: Starting tool execution: {tool_name}/{action}")
         result = await tool_service.execute_tool_action(
             user_id=effective_user_id,
             tool_name=tool_name,
             action_name=action,
             parameters=parameters
         )
-        print(f"✅ DEBUG [RAW]: Tool execution completed successfully")
         return result
         
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid JSON in request body: {str(e)}")
     except Exception as e:
-        print(f"💥 DEBUG [RAW]: Debug execution failed: {str(e)}")
-        print(f"🔍 DEBUG [RAW]: Exception type: {type(e).__name__}")
-        return {"error": str(e), "type": type(e).__name__}
+        raise HTTPException(status_code=500, detail=f"Tool execution failed: {str(e)}")
 
 
 @router.get("/openai-tools")
