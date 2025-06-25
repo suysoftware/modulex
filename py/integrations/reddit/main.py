@@ -333,6 +333,10 @@ def get_user_info(parameters: Dict[str, Any], user_credentials: Optional[Dict[st
         if not access_token:
             raise ValueError(f"No access token found in credentials. Please re-authenticate with Reddit. Available keys: {list(user_credentials.keys())}")
         
+        # Debug scope information
+        scope = user_credentials.get("scope", "unknown")
+        print(f"🔍 DEBUG get_user_info: current scope: {scope}")
+        
         # Test if token is still valid by making API call
         try:
             user_data = make_reddit_api_call("/api/v1/me", user_credentials=user_credentials)
@@ -343,6 +347,16 @@ def get_user_info(parameters: Dict[str, Any], user_credentials: Optional[Dict[st
                 raise ValueError("Access denied. Check Reddit app permissions. - ACCESS_DENIED")
             else:
                 raise ValueError(f"Reddit API error: {http_err.response.status_code} - {http_err.response.text} - API_ERROR")
+        
+        # Check required scopes for different operations
+        available_scopes = scope.split() if isinstance(scope, str) else []
+        scope_check = {
+            "read": "read" in available_scopes,
+            "identity": "identity" in available_scopes,
+            "submit": "submit" in available_scopes,
+            "vote": "vote" in available_scopes,
+            "save": "save" in available_scopes
+        }
         
         return {
             "success": True,
@@ -355,6 +369,17 @@ def get_user_info(parameters: Dict[str, Any], user_credentials: Optional[Dict[st
                 "has_verified_email": user_data.get("has_verified_email"),
                 "is_gold": user_data.get("is_gold"),
                 "is_mod": user_data.get("is_mod")
+            },
+            "oauth_info": {
+                "scope": scope,
+                "available_scopes": scope_check,
+                "missing_scopes": [k for k, v in scope_check.items() if not v],
+                "permissions": {
+                    "can_read": scope_check["read"] and scope_check["identity"],
+                    "can_submit_posts": scope_check["submit"],
+                    "can_vote": scope_check["vote"],
+                    "can_access_saved": scope_check["save"]
+                }
             }
         }
         
@@ -366,6 +391,11 @@ def get_user_info(parameters: Dict[str, Any], user_credentials: Optional[Dict[st
 def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create a new post in a subreddit."""
     try:
+        # Check scope before attempting operation
+        scope = user_credentials.get("scope", "") if user_credentials else ""
+        if "submit" not in scope:
+            raise ValueError("MISSING_SCOPE: 'submit' scope required for creating posts. Please re-authenticate with Reddit to grant posting permissions.")
+        
         subreddit = parameters.get("subreddit")
         title = parameters.get("title")
         content = parameters.get("content")
@@ -404,6 +434,11 @@ def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str,
 def vote_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Vote on a Reddit post."""
     try:
+        # Check scope before attempting operation
+        scope = user_credentials.get("scope", "") if user_credentials else ""
+        if "vote" not in scope:
+            raise ValueError("MISSING_SCOPE: 'vote' scope required for voting on posts. Please re-authenticate with Reddit to grant voting permissions.")
+        
         submission_id = parameters.get("submission_id")
         vote_direction = parameters.get("direction")  # "up", "down", "clear"
         
@@ -434,10 +469,19 @@ def vote_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, A
 def get_saved_posts(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Get user's saved posts."""
     try:
+        # Check scope before attempting operation
+        scope = user_credentials.get("scope", "") if user_credentials else ""
+        if "save" not in scope:
+            raise ValueError("MISSING_SCOPE: 'save' scope required for accessing saved posts. Please re-authenticate with Reddit to grant save permissions.")
+        
         limit = parameters.get("limit", 25)
         
         reddit = get_reddit_client(user_credentials)
         user = reddit.user.me()
+        
+        if user is None:
+            raise ValueError("AUTHENTICATION_ERROR: Unable to get user information. Please re-authenticate with Reddit.")
+        
         saved_items = user.saved(limit=limit)
         
         posts = []
