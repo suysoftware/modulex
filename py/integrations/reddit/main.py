@@ -436,10 +436,42 @@ def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str,
             # Debug the response
             print(f"🔍 DEBUG create_post API response: {result}")
             
+            # Check for errors in different response formats
             if result.get("json", {}).get("errors"):
                 errors = result["json"]["errors"]
                 raise ValueError(f"Reddit API errors: {errors}")
             
+            # Reddit API returns jQuery format, look for redirect URL
+            if result.get("jquery") and result.get("success"):
+                # Parse redirect URL from jQuery response
+                redirect_url = None
+                for command in result.get("jquery", []):
+                    if len(command) > 2 and command[2] == "call" and len(command[3]) > 0:
+                        potential_url = command[3][0]
+                        if isinstance(potential_url, str) and "/comments/" in potential_url:
+                            redirect_url = potential_url
+                            break
+                
+                if redirect_url:
+                    # Extract post ID from URL: /r/subreddit/comments/POST_ID/title/
+                    import re
+                    match = re.search(r'/comments/([a-zA-Z0-9]+)/', redirect_url)
+                    if match:
+                        submission_id = match.group(1)
+                        print(f"🔍 DEBUG extracted submission_id: {submission_id}")
+                        
+                        return {
+                            "success": True,
+                            "post": {
+                                "id": submission_id,
+                                "title": title,
+                                "url": redirect_url,
+                                "permalink": redirect_url,
+                                "created_utc": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                        }
+            
+            # Fallback for standard JSON response
             submission_data = result.get("json", {}).get("data", {})
             submission_id = submission_data.get("id")
             submission_name = submission_data.get("name")
