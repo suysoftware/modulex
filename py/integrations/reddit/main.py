@@ -404,28 +404,77 @@ def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str,
         if not subreddit or not title:
             raise ValueError("subreddit and title are required")
         
-        reddit = get_reddit_client(user_credentials)
-        subreddit_obj = reddit.subreddit(subreddit)
-        
-        if post_type == "text":
-            submission = subreddit_obj.submit(title=title, selftext=content or "")
-        elif post_type == "link":
-            if not content:
-                raise ValueError("URL is required for link posts")
-            submission = subreddit_obj.submit(title=title, url=content)
-        else:
-            raise ValueError("Unsupported post type")
-        
-        return {
-            "success": True,
-            "post": {
-                "id": submission.id,
-                "title": submission.title,
-                "url": submission.url,
-                "permalink": f"https://reddit.com{submission.permalink}",
-                "created_utc": format_utc_timestamp(submission.created_utc)
+        # Try direct API approach first
+        try:
+            if post_type == "text":
+                api_data = {
+                    "sr": subreddit,
+                    "title": title,
+                    "text": content or "",
+                    "kind": "self"
+                }
+            elif post_type == "link":
+                if not content:
+                    raise ValueError("URL is required for link posts")
+                api_data = {
+                    "sr": subreddit,
+                    "title": title,
+                    "url": content,
+                    "kind": "link"
+                }
+            else:
+                raise ValueError("Unsupported post type")
+            
+            # Make direct API call to submit
+            result = make_reddit_api_call("/api/submit", method="POST", data=api_data, user_credentials=user_credentials)
+            
+            if result.get("json", {}).get("errors"):
+                errors = result["json"]["errors"]
+                raise ValueError(f"Reddit API errors: {errors}")
+            
+            submission_data = result.get("json", {}).get("data", {})
+            submission_id = submission_data.get("id")
+            submission_name = submission_data.get("name")
+            
+            return {
+                "success": True,
+                "post": {
+                    "id": submission_id,
+                    "name": submission_name,
+                    "title": title,
+                    "url": submission_data.get("url", ""),
+                    "permalink": f"https://reddit.com/r/{subreddit}/comments/{submission_id}/",
+                    "created_utc": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                }
             }
-        }
+            
+        except Exception as api_error:
+            print(f"🔍 DEBUG: Direct API failed: {str(api_error)}")
+            print(f"🔍 DEBUG: Falling back to PRAW...")
+            
+            # Fallback to PRAW
+            reddit = get_reddit_client(user_credentials)
+            subreddit_obj = reddit.subreddit(subreddit)
+            
+            if post_type == "text":
+                submission = subreddit_obj.submit(title=title, selftext=content or "")
+            elif post_type == "link":
+                if not content:
+                    raise ValueError("URL is required for link posts")
+                submission = subreddit_obj.submit(title=title, url=content)
+            else:
+                raise ValueError("Unsupported post type")
+            
+            return {
+                "success": True,
+                "post": {
+                    "id": submission.id,
+                    "title": submission.title,
+                    "url": submission.url,
+                    "permalink": f"https://reddit.com{submission.permalink}",
+                    "created_utc": format_utc_timestamp(submission.created_utc)
+                }
+            }
         
     except Exception as e:
         raise ValueError(f"Failed to create post: {str(e)}")
