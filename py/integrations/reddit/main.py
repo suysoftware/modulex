@@ -49,10 +49,15 @@ def make_reddit_api_call(endpoint: str, method: str = "GET", data: Dict[str, Any
     base_url = "https://oauth.reddit.com"
     url = f"{base_url}{endpoint}"
     
+    # Reddit API for form submissions needs form data, not JSON
     if method.upper() == "GET":
         response = requests.get(url, headers=headers, params=data)
     elif method.upper() == "POST":
-        response = requests.post(url, headers=headers, json=data)
+        if endpoint == "/api/submit":
+            # Use form data for submit endpoint
+            response = requests.post(url, headers=headers, data=data)
+        else:
+            response = requests.post(url, headers=headers, json=data)
     elif method.upper() == "PUT":
         response = requests.put(url, headers=headers, json=data)
     elif method.upper() == "DELETE":
@@ -428,6 +433,9 @@ def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str,
             # Make direct API call to submit
             result = make_reddit_api_call("/api/submit", method="POST", data=api_data, user_credentials=user_credentials)
             
+            # Debug the response
+            print(f"🔍 DEBUG create_post API response: {result}")
+            
             if result.get("json", {}).get("errors"):
                 errors = result["json"]["errors"]
                 raise ValueError(f"Reddit API errors: {errors}")
@@ -435,6 +443,10 @@ def create_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str,
             submission_data = result.get("json", {}).get("data", {})
             submission_id = submission_data.get("id")
             submission_name = submission_data.get("name")
+            
+            print(f"🔍 DEBUG submission_data: {submission_data}")
+            print(f"🔍 DEBUG submission_id: {submission_id}")
+            print(f"🔍 DEBUG submission_name: {submission_name}")
             
             return {
                 "success": True,
