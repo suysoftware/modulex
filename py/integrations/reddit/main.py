@@ -538,22 +538,57 @@ def vote_post(parameters: Dict[str, Any], user_credentials: Optional[Dict[str, A
         if not submission_id or not vote_direction:
             raise ValueError("submission_id and direction are required")
         
-        reddit = get_reddit_client(user_credentials)
-        submission = reddit.submission(submission_id)
-        
+        # Convert vote direction to Reddit API format
         if vote_direction == "up":
-            submission.upvote()
+            dir_value = 1
         elif vote_direction == "down":
-            submission.downvote()
+            dir_value = -1
         elif vote_direction == "clear":
-            submission.clear_vote()
+            dir_value = 0
         else:
             raise ValueError("Invalid vote direction. Use 'up', 'down', or 'clear'")
         
-        return {
-            "success": True,
-            "message": f"Vote {vote_direction} applied to submission {submission_id}"
-        }
+        # Try direct API approach first
+        try:
+            # Reddit API expects fullname format (t3_postid)
+            fullname = f"t3_{submission_id}"
+            
+            api_data = {
+                "id": fullname,
+                "dir": str(dir_value)
+            }
+            
+            # Make direct API call to vote
+            result = make_reddit_api_call("/api/vote", method="POST", data=api_data, user_credentials=user_credentials)
+            
+            print(f"🔍 DEBUG vote_post API response: {result}")
+            
+            return {
+                "success": True,
+                "message": f"Vote {vote_direction} applied to submission {submission_id}",
+                "vote_direction": vote_direction,
+                "submission_id": submission_id
+            }
+            
+        except Exception as api_error:
+            print(f"🔍 DEBUG: Direct API vote failed: {str(api_error)}")
+            print(f"🔍 DEBUG: Falling back to PRAW...")
+            
+            # Fallback to PRAW
+            reddit = get_reddit_client(user_credentials)
+            submission = reddit.submission(submission_id)
+            
+            if vote_direction == "up":
+                submission.upvote()
+            elif vote_direction == "down":
+                submission.downvote()
+            elif vote_direction == "clear":
+                submission.clear_vote()
+            
+            return {
+                "success": True,
+                "message": f"Vote {vote_direction} applied to submission {submission_id} (via PRAW fallback)"
+            }
         
     except Exception as e:
         raise ValueError(f"Failed to vote: {str(e)}")
