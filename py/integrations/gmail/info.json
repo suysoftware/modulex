@@ -1,0 +1,113 @@
+{
+    "name": "gmail",
+    "display_name": "Gmail",
+    "description": "Gmail integration for sending, reading, and managing emails",
+    "version": "1.0.0",
+    "author": "ModuleX",
+    "requires_auth": true,
+    "auth_type": "oauth2",
+    "setup_environment_variables": [
+        {
+            "name": "GMAIL_CLIENT_ID",
+            "description": "Gmail OAuth2 Client ID from Google Cloud Console",
+            "sample_format": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
+            "about_url": "https://console.developers.google.com/apis/credentials"
+        },
+        {
+            "name": "GMAIL_CLIENT_SECRET",
+            "description": "Gmail OAuth2 Client Secret from Google Cloud Console",
+            "sample_format": "GOCSPX-abcdefghijklmnopqrstuvwxyz123456",
+            "about_url": "https://console.developers.google.com/apis/credentials"
+        }
+    ],
+    "actions": [
+        {
+            "name": "send_email",
+            "description": "Send an email to specified recipient",
+            "parameters": {
+                "recipient": {
+                    "type": "string",
+                    "description": "Recipient email address",
+                    "required": true
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "Email subject",
+                    "required": true
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Email content/body",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "get_unread_emails",
+            "description": "Retrieve unread emails from inbox",
+            "parameters": {
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of emails to return",
+                    "default": 10,
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "read_email",
+            "description": "Read specific email content by email ID",
+            "parameters": {
+                "email_id": {
+                    "type": "string",
+                    "description": "Gmail message ID",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "mark_email_as_read",
+            "description": "Mark email as read by email ID",
+            "parameters": {
+                "email_id": {
+                    "type": "string",
+                    "description": "Gmail message ID",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "trash_email",
+            "description": "Move email to trash by email ID",
+            "parameters": {
+                "email_id": {
+                    "type": "string",
+                    "description": "Gmail message ID",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "search_emails",
+            "description": "Search emails with query",
+            "parameters": {
+                "query": {
+                    "type": "string",
+                    "description": "Gmail search query (e.g., 'from:example@gmail.com', 'subject:important')",
+                    "required": true
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of emails to return",
+                    "default": 10,
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "get_user_profile",
+            "description": "Get authenticated user's Gmail profile information",
+            "parameters": {}
+        }
+    ]
+}
