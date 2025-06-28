@@ -43,28 +43,54 @@ def get_auth_headers(user_credentials: Optional[Dict[str, Any]] = None) -> Dict[
     }
 
 
-def make_reddit_api_call(endpoint: str, method: str = "GET", data: Dict[str, Any] = None, user_credentials: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Make authenticated Reddit API call"""
+def make_reddit_api_call(endpoint: str, method: str = "GET", data: Dict[str, Any] = None, user_credentials: Optional[Dict[str, Any]] = None, retry_on_auth_error: bool = True) -> Dict[str, Any]:
+    """Make authenticated Reddit API call with automatic token refresh"""
     headers = get_auth_headers(user_credentials)
     base_url = "https://oauth.reddit.com"
     url = f"{base_url}{endpoint}"
     
-    # Reddit API for form submissions needs form data, not JSON
-    if method.upper() == "GET":
-        response = requests.get(url, headers=headers, params=data)
-    elif method.upper() == "POST":
-        if endpoint == "/api/submit":
-            # Use form data for submit endpoint
-            response = requests.post(url, headers=headers, data=data)
-        else:
-            response = requests.post(url, headers=headers, json=data)
-    elif method.upper() == "PUT":
-        response = requests.put(url, headers=headers, json=data)
-    elif method.upper() == "DELETE":
-        response = requests.delete(url, headers=headers)
+    def _make_request():
+        # Reddit API for form submissions needs form data, not JSON
+        if method.upper() == "GET":
+            return requests.get(url, headers=headers, params=data)
+        elif method.upper() == "POST":
+            if endpoint in ["/api/submit", "/api/vote"]:
+                # Use form data for submit and vote endpoints
+                return requests.post(url, headers=headers, data=data)
+            else:
+                return requests.post(url, headers=headers, json=data)
+        elif method.upper() == "PUT":
+            return requests.put(url, headers=headers, json=data)
+        elif method.upper() == "DELETE":
+            return requests.delete(url, headers=headers)
     
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = _make_request()
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        # Check if it's an authentication error and we have retry enabled
+        if retry_on_auth_error and e.response.status_code in [401, 403] and user_credentials:
+            print(f"🔄 DEBUG: Got {e.response.status_code}, attempting token refresh...")
+            
+            # Try to refresh token
+            refreshed_creds = refresh_reddit_token(user_credentials)
+            if refreshed_creds:
+                print(f"✅ DEBUG: Token refreshed, retrying API call...")
+                # Update headers with new token and retry once
+                headers = get_auth_headers(refreshed_creds)
+                try:
+                    response = _make_request()
+                    response.raise_for_status()
+                    return response.json()
+                except requests.exceptions.HTTPError as retry_error:
+                    print(f"💥 DEBUG: Retry after refresh also failed: {retry_error.response.status_code}")
+                    raise retry_error
+            else:
+                print(f"💥 DEBUG: Token refresh failed, raising original error")
+        
+        # Re-raise the original error
+        raise e
 
 
 def get_reddit_client(user_credentials: Optional[Dict[str, Any]] = None):
@@ -88,6 +114,67 @@ def get_reddit_client(user_credentials: Optional[Dict[str, Any]] = None):
         refresh_token=creds["refresh_token"],
         user_agent="ModuleX Reddit Integration/1.0"
     )
+
+
+def refresh_reddit_token(user_credentials: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Refresh Reddit OAuth token using refresh_token"""
+    try:
+        refresh_token = user_credentials.get("refresh_token")
+        if not refresh_token:
+            print(f"🔍 DEBUG: No refresh token available")
+            return None
+        
+        creds = get_reddit_credentials(user_credentials)
+        client_id = creds.get("client_id")
+        client_secret = creds.get("client_secret")
+        
+        if not client_id or not client_secret:
+            print(f"🔍 DEBUG: Missing client credentials for token refresh")
+            return None
+        
+        # Reddit token refresh endpoint
+        token_url = "https://www.reddit.com/api/v1/access_token"
+        
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token
+        }
+        
+        # Reddit requires Basic Auth for token refresh
+        import base64
+        auth_string = f"{client_id}:{client_secret}"
+        auth_bytes = base64.b64encode(auth_string.encode()).decode()
+        
+        headers = {
+            "Authorization": f"Basic {auth_bytes}",
+            "User-Agent": "ModuleX Reddit Integration/1.0",
+            "Accept": "application/json"
+        }
+        
+        response = requests.post(token_url, data=data, headers=headers)
+        
+        print(f"🔍 DEBUG: Token refresh response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            
+            # Merge with existing credentials (preserve refresh_token and scope)
+            refreshed_creds = {**user_credentials}  # Copy original credentials
+            refreshed_creds.update(token_data)  # Update with new token data
+            
+            # Ensure refresh_token is preserved if not in response
+            if "refresh_token" not in token_data:
+                refreshed_creds["refresh_token"] = refresh_token
+            
+            print(f"✅ DEBUG: Token refreshed successfully")
+            return refreshed_creds
+        else:
+            print(f"💥 DEBUG: Token refresh failed: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"💥 DEBUG: Exception during token refresh: {str(e)}")
+        return None
 
 
 def format_utc_timestamp(timestamp: float, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:

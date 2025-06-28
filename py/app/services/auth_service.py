@@ -483,6 +483,72 @@ class AuthService:
         
         return False
 
+    async def refresh_token(self, user_id: str, tool_name: str) -> Optional[Dict[str, Any]]:
+        """Refresh OAuth token for a user's tool"""
+        user = await self.get_or_create_user(user_id)
+        
+        # Get current credentials
+        current_creds = await self.get_user_credentials(user_id, tool_name)
+        if not current_creds or not current_creds.get("refresh_token"):
+            print(f"🔍 DEBUG: No refresh token available for {tool_name}")
+            return None
+        
+        if tool_name not in self.OAUTH_CONFIGS:
+            print(f"🔍 DEBUG: Tool {tool_name} not in OAuth configs")
+            return None
+        
+        config = self.OAUTH_CONFIGS[tool_name]
+        
+        try:
+            data = {
+                "grant_type": "refresh_token",
+                "refresh_token": current_creds["refresh_token"]
+            }
+            
+            headers = {"Accept": "application/json"}
+            
+            # Reddit requires Basic Auth for token refresh
+            if tool_name == "reddit":
+                import base64
+                auth_string = f"{config['client_id']}:{config['client_secret']}"
+                auth_bytes = base64.b64encode(auth_string.encode()).decode()
+                headers["Authorization"] = f"Basic {auth_bytes}"
+                headers["User-Agent"] = "ModuleX/1.0"
+            else:
+                data.update({
+                    "client_id": config["client_id"],
+                    "client_secret": config["client_secret"]
+                })
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(config["token_url"], data=data, headers=headers)
+                
+                print(f"🔍 DEBUG: {tool_name} token refresh status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    token_data = response.json()
+                    
+                    # Merge with existing credentials (keep refresh_token if not provided in response)
+                    if "refresh_token" not in token_data:
+                        token_data["refresh_token"] = current_creds["refresh_token"]
+                    
+                    # Preserve scope information
+                    if "scope" not in token_data and "scope" in current_creds:
+                        token_data["scope"] = current_creds["scope"]
+                    
+                    # Save new credentials
+                    await self._save_credentials(user, tool_name, token_data)
+                    
+                    print(f"✅ DEBUG: {tool_name} token refreshed successfully")
+                    return token_data
+                else:
+                    print(f"💥 DEBUG: {tool_name} token refresh failed: {response.status_code} - {response.text}")
+                    return None
+                    
+        except Exception as e:
+            print(f"💥 DEBUG: Exception during {tool_name} token refresh: {str(e)}")
+            return None
+
     async def get_tool_auth_type(self, tool_name: str) -> Optional[str]:
         """Get the auth_type for a tool by reading its info.json file"""
         try:
