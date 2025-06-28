@@ -41,6 +41,13 @@ class AuthService:
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
         },
+        "gmail": {
+            "auth_url": "https://accounts.google.com/o/oauth2/auth",
+            "token_url": "https://oauth2.googleapis.com/token",
+            "scopes": ["https://www.googleapis.com/auth/gmail.modify"],
+            "client_id": settings.GMAIL_CLIENT_ID,
+            "client_secret": settings.GMAIL_CLIENT_SECRET,
+        },
         "slack": {
             "auth_url": "https://slack.com/oauth/v2/authorize",
             "token_url": "https://slack.com/api/oauth.v2.access",

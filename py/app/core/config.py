@@ -30,6 +30,9 @@ class Settings:
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     
+    GMAIL_CLIENT_ID: str = os.getenv("GMAIL_CLIENT_ID", "")
+    GMAIL_CLIENT_SECRET: str = os.getenv("GMAIL_CLIENT_SECRET", "")
+    
     SLACK_CLIENT_ID: str = os.getenv("SLACK_CLIENT_ID", "")
     SLACK_CLIENT_SECRET: str = os.getenv("SLACK_CLIENT_SECRET", "")
     
