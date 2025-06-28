@@ -133,6 +133,10 @@ class AuthService:
             f"&response_type=code"
         )
         
+        # Reddit specific: Add duration=permanent to get refresh token
+        if tool_name == "reddit":
+            auth_url += "&duration=permanent"
+        
         return auth_url, state
     
     async def handle_callback(self, tool_name: str, code: str, state: str) -> bool:

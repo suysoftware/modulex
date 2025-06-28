@@ -121,7 +121,7 @@ def refresh_reddit_token(user_credentials: Dict[str, Any]) -> Optional[Dict[str,
     try:
         refresh_token = user_credentials.get("refresh_token")
         if not refresh_token:
-            print(f"🔍 DEBUG: No refresh token available")
+            print(f"🔍 DEBUG: No refresh token available - user needs to re-authorize")
             return None
         
         creds = get_reddit_credentials(user_credentials)
@@ -434,7 +434,11 @@ def get_user_info(parameters: Dict[str, Any], user_credentials: Optional[Dict[st
             user_data = make_reddit_api_call("/api/v1/me", user_credentials=user_credentials)
         except requests.exceptions.HTTPError as http_err:
             if http_err.response.status_code == 401:
-                raise ValueError("Access token is expired or invalid. Please re-authenticate with Reddit. - INVALID_TOKEN")
+                # Check if we have refresh token for more specific error message
+                if not user_credentials.get("refresh_token"):
+                    raise ValueError("Access token expired and no refresh token available. Please re-authorize with Reddit to grant permanent access. - TOKEN_EXPIRED_NO_REFRESH")
+                else:
+                    raise ValueError("Access token is expired or invalid. Please re-authenticate with Reddit. - INVALID_TOKEN")
             elif http_err.response.status_code == 403:
                 raise ValueError("Access denied. Check Reddit app permissions. - ACCESS_DENIED")
             else:
