@@ -126,6 +126,12 @@
                 "data": {
                     "type": "array",
                     "description": "2D array of data to populate the spreadsheet (e.g., [['Name', 'Status'], ['John', 'Present'], ['Jane', 'Absent']])",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "optional": true
                 },
                 "folder_id": {
