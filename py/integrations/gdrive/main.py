@@ -15,8 +15,13 @@ from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 
 def debug_print(message: str):
-    """Print debug messages to stderr to avoid interfering with JSON output"""
-    print(message, file=sys.stderr)
+    """Print debug messages to both stderr and stdout for visibility"""
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+    formatted_message = f"[{timestamp}] {message}"
+    print(formatted_message, file=sys.stderr, flush=True)
+    # Also print to stdout with a prefix so it's visible in docker logs
+    print(f"GDRIVE_DEBUG: {formatted_message}", flush=True)
 
 
 class GoogleDriveService:
@@ -553,12 +558,23 @@ def main():
     """Main function to handle incoming requests"""
     try:
         # Read input from stdin
-        input_data = json.loads(sys.stdin.read())
+        raw_input = sys.stdin.read()
+        debug_print(f"📥 DEBUG [GDrive]: Raw input received: {raw_input}")
+        
+        input_data = json.loads(raw_input)
         action = input_data.get("action")
         params = input_data.get("params", {})
         
         debug_print(f"🚀 DEBUG [GDrive]: Executing action: {action}")
+        debug_print(f"📋 DEBUG [GDrive]: Full input data: {input_data}")
         debug_print(f"📋 DEBUG [GDrive]: Parameters: {params}")
+        
+        # Log specific parameters for create_document
+        if action == "create_document":
+            title = params.get("title")
+            content = params.get("content")
+            debug_print(f"📄 DEBUG [GDrive]: Title parameter: '{title}' (type: {type(title)})")
+            debug_print(f"📄 DEBUG [GDrive]: Content parameter length: {len(content) if content else 0}")
         
         # Initialize the service
         gdrive_service = GoogleDriveService()
@@ -612,7 +628,8 @@ def main():
         else:
             result = {"status": "error", "error_message": f"Unknown action: {action}"}
         
-        # Output the result as JSON
+        # Output the result as JSON (separate from debug messages)
+        debug_print(f"📤 DEBUG [GDrive]: Sending result: {result}")
         print(json.dumps(result, indent=2))
         
     except Exception as e:
