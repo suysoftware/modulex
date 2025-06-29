@@ -565,6 +565,10 @@ def main():
         action = input_data.get("action")
         params = input_data.get("params", {})
         
+        # Try both "params" and "parameters" for compatibility
+        if not params:
+            params = input_data.get("parameters", {})
+        
         debug_print(f"🚀 DEBUG [GDrive]: Executing action: {action}")
         debug_print(f"📋 DEBUG [GDrive]: Full input data: {input_data}")
         debug_print(f"📋 DEBUG [GDrive]: Parameters: {params}")
