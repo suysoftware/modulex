@@ -92,6 +92,80 @@
                     "required": true
                 }
             }
+        },
+        {
+            "name": "create_document",
+            "description": "Create a new Google Docs document with content",
+            "parameters": {
+                "title": {
+                    "type": "string",
+                    "description": "Document title",
+                    "required": true
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Document content/text",
+                    "required": true
+                },
+                "folder_id": {
+                    "type": "string",
+                    "description": "Folder ID to create document in (optional)",
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "create_spreadsheet",
+            "description": "Create a new Google Sheets spreadsheet",
+            "parameters": {
+                "title": {
+                    "type": "string",
+                    "description": "Spreadsheet title",
+                    "required": true
+                },
+                "folder_id": {
+                    "type": "string",
+                    "description": "Folder ID to create spreadsheet in (optional)",
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "create_presentation",
+            "description": "Create a new Google Slides presentation",
+            "parameters": {
+                "title": {
+                    "type": "string",
+                    "description": "Presentation title",
+                    "required": true
+                },
+                "folder_id": {
+                    "type": "string",
+                    "description": "Folder ID to create presentation in (optional)",
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "create_text_file",
+            "description": "Create a new plain text file",
+            "parameters": {
+                "title": {
+                    "type": "string",
+                    "description": "File name (with .txt extension)",
+                    "required": true
+                },
+                "content": {
+                    "type": "string",
+                    "description": "File content",
+                    "required": true
+                },
+                "folder_id": {
+                    "type": "string",
+                    "description": "Folder ID to create file in (optional)",
+                    "optional": true
+                }
+            }
         }
     ]
 }

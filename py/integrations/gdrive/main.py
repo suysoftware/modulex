@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 
 def debug_print(message: str):
@@ -24,7 +24,10 @@ class GoogleDriveService:
         self.client_id = os.getenv("GOOGLE_CLIENT_ID")
         self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         self.access_token = os.getenv("ACCESS_TOKEN")
-        self.scopes = ['https://www.googleapis.com/auth/drive.readonly']
+        self.scopes = [
+            'https://www.googleapis.com/auth/drive.file',
+            'https://www.googleapis.com/auth/docs'
+        ]
         
         if not self.client_id:
             raise ValueError("GOOGLE_CLIENT_ID environment variable not set")
@@ -39,6 +42,7 @@ class GoogleDriveService:
         
         self.credentials = self._create_credentials()
         self.service = self._get_service()
+        self.docs_service = self._get_docs_service()
         
         debug_print("✅ DEBUG [GDrive]: Service initialized successfully")
 
@@ -63,6 +67,15 @@ class GoogleDriveService:
         except HttpError as error:
             debug_print(f'❌ DEBUG [GDrive]: Error building Drive service: {error}')
             raise ValueError(f'Google Drive service error: {error}')
+
+    def _get_docs_service(self):
+        """Initialize Google Docs API service"""
+        try:
+            service = build('docs', 'v1', credentials=self.credentials)
+            return service
+        except HttpError as error:
+            debug_print(f'❌ DEBUG [GDrive]: Error building Docs service: {error}')
+            raise ValueError(f'Google Docs service error: {error}')
 
     def search_files(self, query: str, page_size: int = 10) -> Dict[str, Any]:
         """Search for files in Google Drive"""
@@ -271,6 +284,213 @@ class GoogleDriveService:
             debug_print(f"❌ DEBUG [GDrive]: Download file error: {error}")
             return {"status": "error", "error_message": str(error)}
 
+    def create_document(self, title: str, content: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new Google Docs document with content"""
+        try:
+            debug_print(f"📝 DEBUG [GDrive]: Creating document: {title}")
+            
+            # Create the document metadata
+            file_metadata = {
+                'name': title,
+                'mimeType': 'application/vnd.google-apps.document'
+            }
+            
+            # Add to specific folder if provided
+            if folder_id:
+                file_metadata['parents'] = [folder_id]
+            
+            # Create the document
+            doc = self.service.files().create(body=file_metadata).execute()
+            document_id = doc.get('id')
+            
+            debug_print(f"📄 DEBUG [GDrive]: Document created with ID: {document_id}")
+            
+            # Add content to the document using Google Docs API
+            if content:
+                try:
+                    requests = [
+                        {
+                            'insertText': {
+                                'location': {
+                                    'index': 1,
+                                },
+                                'text': content
+                            }
+                        }
+                    ]
+                    
+                    self.docs_service.documents().batchUpdate(
+                        documentId=document_id,
+                        body={'requests': requests}
+                    ).execute()
+                    
+                    debug_print("✅ DEBUG [GDrive]: Content added to document successfully")
+                except HttpError as e:
+                    debug_print(f"⚠️ DEBUG [GDrive]: Content addition failed: {e}")
+            
+            # Get the created document details
+            created_doc = self.service.files().get(
+                fileId=document_id,
+                fields="id, name, mimeType, webViewLink, createdTime"
+            ).execute()
+            
+            result = {
+                "status": "success",
+                "document": {
+                    "id": created_doc['id'],
+                    "name": created_doc['name'],
+                    "mime_type": created_doc['mimeType'],
+                    "web_view_link": created_doc.get('webViewLink', ''),
+                    "created_time": created_doc.get('createdTime', ''),
+                    "content_added": bool(content)
+                }
+            }
+            
+            debug_print("✅ DEBUG [GDrive]: Document created successfully")
+            return result
+            
+        except HttpError as error:
+            debug_print(f"❌ DEBUG [GDrive]: Create document error: {error}")
+            return {"status": "error", "error_message": str(error)}
+
+    def create_spreadsheet(self, title: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new Google Sheets spreadsheet"""
+        try:
+            debug_print(f"📊 DEBUG [GDrive]: Creating spreadsheet: {title}")
+            
+            # Create the spreadsheet metadata
+            file_metadata = {
+                'name': title,
+                'mimeType': 'application/vnd.google-apps.spreadsheet'
+            }
+            
+            # Add to specific folder if provided
+            if folder_id:
+                file_metadata['parents'] = [folder_id]
+            
+            # Create the spreadsheet
+            spreadsheet = self.service.files().create(body=file_metadata).execute()
+            
+            # Get the created spreadsheet details
+            created_sheet = self.service.files().get(
+                fileId=spreadsheet['id'],
+                fields="id, name, mimeType, webViewLink, createdTime"
+            ).execute()
+            
+            result = {
+                "status": "success",
+                "spreadsheet": {
+                    "id": created_sheet['id'],
+                    "name": created_sheet['name'],
+                    "mime_type": created_sheet['mimeType'],
+                    "web_view_link": created_sheet.get('webViewLink', ''),
+                    "created_time": created_sheet.get('createdTime', '')
+                }
+            }
+            
+            debug_print("✅ DEBUG [GDrive]: Spreadsheet created successfully")
+            return result
+            
+        except HttpError as error:
+            debug_print(f"❌ DEBUG [GDrive]: Create spreadsheet error: {error}")
+            return {"status": "error", "error_message": str(error)}
+
+    def create_presentation(self, title: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new Google Slides presentation"""
+        try:
+            debug_print(f"🎯 DEBUG [GDrive]: Creating presentation: {title}")
+            
+            # Create the presentation metadata
+            file_metadata = {
+                'name': title,
+                'mimeType': 'application/vnd.google-apps.presentation'
+            }
+            
+            # Add to specific folder if provided
+            if folder_id:
+                file_metadata['parents'] = [folder_id]
+            
+            # Create the presentation
+            presentation = self.service.files().create(body=file_metadata).execute()
+            
+            # Get the created presentation details
+            created_presentation = self.service.files().get(
+                fileId=presentation['id'],
+                fields="id, name, mimeType, webViewLink, createdTime"
+            ).execute()
+            
+            result = {
+                "status": "success",
+                "presentation": {
+                    "id": created_presentation['id'],
+                    "name": created_presentation['name'],
+                    "mime_type": created_presentation['mimeType'],
+                    "web_view_link": created_presentation.get('webViewLink', ''),
+                    "created_time": created_presentation.get('createdTime', '')
+                }
+            }
+            
+            debug_print("✅ DEBUG [GDrive]: Presentation created successfully")
+            return result
+            
+        except HttpError as error:
+            debug_print(f"❌ DEBUG [GDrive]: Create presentation error: {error}")
+            return {"status": "error", "error_message": str(error)}
+
+    def create_text_file(self, title: str, content: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new plain text file"""
+        try:
+            debug_print(f"📄 DEBUG [GDrive]: Creating text file: {title}")
+            
+            # Create the file metadata
+            file_metadata = {
+                'name': title,
+                'mimeType': 'text/plain'
+            }
+            
+            # Add to specific folder if provided
+            if folder_id:
+                file_metadata['parents'] = [folder_id]
+            
+            # Create media upload with content
+            media = MediaIoBaseUpload(
+                io.BytesIO(content.encode('utf-8')),
+                mimetype='text/plain',
+                resumable=True
+            )
+            
+            # Create the file
+            file = self.service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
+            
+            # Get the created file details
+            created_file = self.service.files().get(
+                fileId=file['id'],
+                fields="id, name, mimeType, webViewLink, createdTime, size"
+            ).execute()
+            
+            result = {
+                "status": "success",
+                "file": {
+                    "id": created_file['id'],
+                    "name": created_file['name'],
+                    "mime_type": created_file['mimeType'],
+                    "web_view_link": created_file.get('webViewLink', ''),
+                    "created_time": created_file.get('createdTime', ''),
+                    "size": created_file.get('size', 'N/A')
+                }
+            }
+            
+            debug_print("✅ DEBUG [GDrive]: Text file created successfully")
+            return result
+            
+        except HttpError as error:
+            debug_print(f"❌ DEBUG [GDrive]: Create text file error: {error}")
+            return {"status": "error", "error_message": str(error)}
+
 
 def main():
     """Main function to handle incoming requests"""
@@ -309,6 +529,28 @@ def main():
         elif action == "download_file":
             result = gdrive_service.download_file(
                 file_id=params.get("file_id")
+            )
+        elif action == "create_document":
+            result = gdrive_service.create_document(
+                title=params.get("title"),
+                content=params.get("content"),
+                folder_id=params.get("folder_id")
+            )
+        elif action == "create_spreadsheet":
+            result = gdrive_service.create_spreadsheet(
+                title=params.get("title"),
+                folder_id=params.get("folder_id")
+            )
+        elif action == "create_presentation":
+            result = gdrive_service.create_presentation(
+                title=params.get("title"),
+                folder_id=params.get("folder_id")
+            )
+        elif action == "create_text_file":
+            result = gdrive_service.create_text_file(
+                title=params.get("title"),
+                content=params.get("content"),
+                folder_id=params.get("folder_id")
             )
         else:
             result = {"status": "error", "error_message": f"Unknown action: {action}"}
