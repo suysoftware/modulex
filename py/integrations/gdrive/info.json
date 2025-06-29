@@ -8,14 +8,14 @@
     "auth_type": "oauth2",
     "setup_environment_variables": [
         {
-            "name": "GDRIVE_CLIENT_ID",
-            "description": "Google Drive OAuth2 Client ID from Google Cloud Console",
+            "name": "GOOGLE_CLIENT_ID",
+            "description": "Google OAuth2 Client ID from Google Cloud Console (shared for Gmail and Google Drive)",
             "sample_format": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
             "about_url": "https://console.developers.google.com/apis/credentials"
         },
         {
-            "name": "GDRIVE_CLIENT_SECRET",
-            "description": "Google Drive OAuth2 Client Secret from Google Cloud Console",
+            "name": "GOOGLE_CLIENT_SECRET",
+            "description": "Google OAuth2 Client Secret from Google Cloud Console (shared for Gmail and Google Drive)",
             "sample_format": "GOCSPX-abcdefghijklmnopqrstuvwxyz123456",
             "about_url": "https://console.developers.google.com/apis/credentials"
         }

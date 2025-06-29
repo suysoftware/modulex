@@ -38,15 +38,15 @@ def decode_mime_header(header: str) -> str:
 
 class GmailService:
     def __init__(self):
-        self.client_id = os.getenv("GMAIL_CLIENT_ID")
-        self.client_secret = os.getenv("GMAIL_CLIENT_SECRET")
+        self.client_id = os.getenv("GOOGLE_CLIENT_ID")
+        self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         self.access_token = os.getenv("ACCESS_TOKEN")
         self.scopes = ['https://www.googleapis.com/auth/gmail.modify']
         
         if not self.client_id:
-            raise ValueError("GMAIL_CLIENT_ID environment variable not set")
+            raise ValueError("GOOGLE_CLIENT_ID environment variable not set")
         if not self.client_secret:
-            raise ValueError("GMAIL_CLIENT_SECRET environment variable not set")
+            raise ValueError("GOOGLE_CLIENT_SECRET environment variable not set")
         if not self.access_token:
             raise ValueError("ACCESS_TOKEN environment variable not set")
         
