@@ -1,0 +1,97 @@
+{
+    "name": "gdrive",
+    "display_name": "Google Drive",
+    "description": "Google Drive integration for managing files and folders",
+    "version": "1.0.0",
+    "author": "ModuleX",
+    "requires_auth": true,
+    "auth_type": "oauth2",
+    "setup_environment_variables": [
+        {
+            "name": "GDRIVE_CLIENT_ID",
+            "description": "Google Drive OAuth2 Client ID from Google Cloud Console",
+            "sample_format": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
+            "about_url": "https://console.developers.google.com/apis/credentials"
+        },
+        {
+            "name": "GDRIVE_CLIENT_SECRET",
+            "description": "Google Drive OAuth2 Client Secret from Google Cloud Console",
+            "sample_format": "GOCSPX-abcdefghijklmnopqrstuvwxyz123456",
+            "about_url": "https://console.developers.google.com/apis/credentials"
+        }
+    ],
+    "actions": [
+        {
+            "name": "search_files",
+            "description": "Search for files in Google Drive",
+            "parameters": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query for file names",
+                    "required": true
+                },
+                "page_size": {
+                    "type": "integer",
+                    "description": "Maximum number of files to return",
+                    "default": 10,
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "get_file",
+            "description": "Get file content and metadata by file ID",
+            "parameters": {
+                "file_id": {
+                    "type": "string",
+                    "description": "Google Drive file ID",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "list_files",
+            "description": "List files in Google Drive with optional filters",
+            "parameters": {
+                "folder_id": {
+                    "type": "string",
+                    "description": "Folder ID to list files from (optional)",
+                    "optional": true
+                },
+                "page_size": {
+                    "type": "integer",
+                    "description": "Maximum number of files to return",
+                    "default": 10,
+                    "optional": true
+                },
+                "mime_type": {
+                    "type": "string",
+                    "description": "Filter by MIME type (optional)",
+                    "optional": true
+                }
+            }
+        },
+        {
+            "name": "get_file_metadata",
+            "description": "Get detailed metadata for a specific file",
+            "parameters": {
+                "file_id": {
+                    "type": "string",
+                    "description": "Google Drive file ID",
+                    "required": true
+                }
+            }
+        },
+        {
+            "name": "download_file",
+            "description": "Download file content as text or binary data",
+            "parameters": {
+                "file_id": {
+                    "type": "string",
+                    "description": "Google Drive file ID",
+                    "required": true
+                }
+            }
+        }
+    ]
+}

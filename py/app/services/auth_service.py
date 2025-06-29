@@ -48,6 +48,13 @@ class AuthService:
             "client_id": settings.GMAIL_CLIENT_ID,
             "client_secret": settings.GMAIL_CLIENT_SECRET,
         },
+        "gdrive": {
+            "auth_url": "https://accounts.google.com/o/oauth2/auth",
+            "token_url": "https://oauth2.googleapis.com/token",
+            "scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+            "client_id": settings.GDRIVE_CLIENT_ID,
+            "client_secret": settings.GDRIVE_CLIENT_SECRET,
+        },
         "slack": {
             "auth_url": "https://slack.com/oauth/v2/authorize",
             "token_url": "https://slack.com/api/oauth.v2.access",

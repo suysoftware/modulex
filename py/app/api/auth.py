@@ -25,7 +25,8 @@ def get_success_html(tool_name: str) -> str:
         "slack": "Slack",
         "gitlab": "GitLab",
         "bitbucket": "Bitbucket",
-        "gmail": "Gmail"
+        "gmail": "Gmail",
+        "gdrive": "Google Drive"
     }
     
     display_name = tool_display_names.get(tool_name, tool_name.title())
