@@ -763,52 +763,33 @@ class GoogleDriveService:
                         element_id = element['objectId']
                         debug_print(f"🎯 DEBUG [GDrive]: Found placeholder type '{placeholder_type}' with ID: {element_id}")
                         
-                        if placeholder_type == 'TITLE':
+                        # Handle different placeholder types
+                        if placeholder_type in ['TITLE', 'CENTERED_TITLE']:
                             title_placeholder = element_id
-                        elif placeholder_type == 'BODY':
+                        elif placeholder_type in ['BODY', 'SUBTITLE']:
                             body_placeholder = element_id
                 
                 debug_print(f"🎯 DEBUG [GDrive]: Slide {i+1} - Title placeholder: {title_placeholder}, Body placeholder: {body_placeholder}")
                 
-                # Clear and add title text
+                # Add title text (simple approach)
                 if title_placeholder and slide_title:
-                    # First delete any existing text (placeholder text)
-                    text_requests.append({
-                        'deleteText': {
-                            'objectId': title_placeholder,
-                            'textRange': {
-                                'type': 'ALL'
-                            }
-                        }
-                    })
-                    # Then insert new text
                     text_requests.append({
                         'insertText': {
                             'objectId': title_placeholder,
                             'text': slide_title
                         }
                     })
-                    debug_print(f"🎯 DEBUG [GDrive]: Added title clear+insert requests for slide {i+1}")
+                    debug_print(f"🎯 DEBUG [GDrive]: Added title insert request for slide {i+1}")
                 
-                # Clear and add body text  
+                # Add body text (simple approach)
                 if body_placeholder and slide_content:
-                    # First delete any existing text (placeholder text)
-                    text_requests.append({
-                        'deleteText': {
-                            'objectId': body_placeholder,
-                            'textRange': {
-                                'type': 'ALL'
-                            }
-                        }
-                    })
-                    # Then insert new text
                     text_requests.append({
                         'insertText': {
                             'objectId': body_placeholder,
                             'text': slide_content
                         }
                     })
-                    debug_print(f"🎯 DEBUG [GDrive]: Added body clear+insert requests for slide {i+1}")
+                    debug_print(f"🎯 DEBUG [GDrive]: Added body insert request for slide {i+1}")
                 
                 # If no placeholders found, create text boxes manually
                 if not title_placeholder and not body_placeholder:
