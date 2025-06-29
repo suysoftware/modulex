@@ -701,20 +701,29 @@ def main():
                 file_id=params.get("file_id")
             )
         elif action == "create_document":
-            result = gdrive_service.create_document(
-                title=params.get("title"),
-                content=params.get("content"),
-                folder_id=params.get("folder_id")
-            )
+            debug_print(f"📄 DEBUG [GDrive]: Document creation temporarily disabled for testing")
+            result = {"status": "error", "error_message": "Document creation temporarily disabled for spreadsheet testing"}
+            # result = gdrive_service.create_document(
+            #     title=params.get("title"),
+            #     content=params.get("content"),
+            #     folder_id=params.get("folder_id")
+            # )
         elif action == "create_spreadsheet":
             # Parse data from JSON string if provided
             data = params.get("data")
+            debug_print(f"📊 DEBUG [GDrive]: Raw data parameter: {data} (type: {type(data)})")
+            
             if data and isinstance(data, str):
                 try:
                     data = json.loads(data)
-                except json.JSONDecodeError:
+                    debug_print(f"✅ DEBUG [GDrive]: Data parsed successfully: {len(data) if data else 0} rows")
+                except json.JSONDecodeError as e:
+                    debug_print(f"❌ DEBUG [GDrive]: JSON decode error: {e}")
                     data = None
-                    debug_print(f"❌ DEBUG [GDrive]: Invalid JSON in data parameter")
+            elif data and isinstance(data, list):
+                debug_print(f"✅ DEBUG [GDrive]: Data already a list: {len(data)} rows")
+            else:
+                debug_print(f"📊 DEBUG [GDrive]: No data provided or invalid format")
             
             result = gdrive_service.create_spreadsheet(
                 title=params.get("title"),
