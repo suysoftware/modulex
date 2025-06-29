@@ -51,7 +51,7 @@ class AuthService:
         "gdrive": {
             "auth_url": "https://accounts.google.com/o/oauth2/auth",
             "token_url": "https://oauth2.googleapis.com/token",
-            "scopes": ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/docs"],
+            "scopes": ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/docs", "https://www.googleapis.com/auth/documents", "https://www.googleapis.com/auth/spreadsheets"],
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
         },

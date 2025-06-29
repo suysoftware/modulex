@@ -31,7 +31,9 @@ class GoogleDriveService:
         self.access_token = os.getenv("ACCESS_TOKEN")
         self.scopes = [
             'https://www.googleapis.com/auth/drive.file',
-            'https://www.googleapis.com/auth/docs'
+            'https://www.googleapis.com/auth/docs',
+            'https://www.googleapis.com/auth/documents',
+            'https://www.googleapis.com/auth/spreadsheets'
         ]
         
         if not self.client_id:
@@ -48,6 +50,7 @@ class GoogleDriveService:
         self.credentials = self._create_credentials()
         self.service = self._get_service()
         self.docs_service = self._get_docs_service()
+        self.sheets_service = self._get_sheets_service()
         
         debug_print("✅ DEBUG [GDrive]: Service initialized successfully")
 
@@ -81,6 +84,15 @@ class GoogleDriveService:
         except HttpError as error:
             debug_print(f'❌ DEBUG [GDrive]: Error building Docs service: {error}')
             raise ValueError(f'Google Docs service error: {error}')
+
+    def _get_sheets_service(self):
+        """Initialize Google Sheets API service"""
+        try:
+            service = build('sheets', 'v4', credentials=self.credentials)
+            return service
+        except HttpError as error:
+            debug_print(f'❌ DEBUG [GDrive]: Error building Sheets service: {error}')
+            raise ValueError(f'Google Sheets service error: {error}')
 
     def search_files(self, query: str, page_size: int = 10) -> Dict[str, Any]:
         """Search for files in Google Drive"""
