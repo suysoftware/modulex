@@ -116,12 +116,17 @@
         },
         {
             "name": "create_spreadsheet",
-            "description": "Create a new Google Sheets spreadsheet",
+            "description": "Create a new Google Sheets spreadsheet with optional data",
             "parameters": {
                 "title": {
                     "type": "string",
                     "description": "Spreadsheet title",
                     "required": true
+                },
+                "data": {
+                    "type": "array",
+                    "description": "2D array of data to populate the spreadsheet (e.g., [['Name', 'Status'], ['John', 'Present'], ['Jane', 'Absent']])",
+                    "optional": true
                 },
                 "folder_id": {
                     "type": "string",

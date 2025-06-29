@@ -427,10 +427,13 @@ class GoogleDriveService:
             debug_print(f"❌ DEBUG [GDrive]: Create document error: {error}")
             return {"status": "error", "error_message": str(error)}
 
-    def create_spreadsheet(self, title: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
-        """Create a new Google Sheets spreadsheet"""
+    def create_spreadsheet(self, title: str, data: Optional[List[List]] = None, folder_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new Google Sheets spreadsheet with optional data"""
         try:
             debug_print(f"📊 DEBUG [GDrive]: Creating spreadsheet: {title}")
+            debug_print(f"📊 DEBUG [GDrive]: Data provided: {bool(data)}")
+            if data:
+                debug_print(f"📊 DEBUG [GDrive]: Data rows: {len(data)}")
             
             # Create the spreadsheet metadata
             file_metadata = {
@@ -444,10 +447,39 @@ class GoogleDriveService:
             
             # Create the spreadsheet
             spreadsheet = self.service.files().create(body=file_metadata).execute()
+            spreadsheet_id = spreadsheet['id']
+            
+            debug_print(f"📊 DEBUG [GDrive]: Spreadsheet created with ID: {spreadsheet_id}")
+            
+            # Add data to the spreadsheet if provided
+            data_added = False
+            if data and len(data) > 0:
+                try:
+                    debug_print(f"📊 DEBUG [GDrive]: Adding data to spreadsheet")
+                    
+                    # Prepare the data for Sheets API
+                    body = {
+                        'values': data
+                    }
+                    
+                    # Update the spreadsheet with data
+                    result = self.sheets_service.spreadsheets().values().update(
+                        spreadsheetId=spreadsheet_id,
+                        range='Sheet1!A1',
+                        valueInputOption='RAW',
+                        body=body
+                    ).execute()
+                    
+                    debug_print(f"✅ DEBUG [GDrive]: Data added successfully: {result.get('updatedCells', 0)} cells updated")
+                    data_added = True
+                    
+                except Exception as e:
+                    debug_print(f"❌ DEBUG [GDrive]: Failed to add data: {e}")
+                    data_added = False
             
             # Get the created spreadsheet details
             created_sheet = self.service.files().get(
-                fileId=spreadsheet['id'],
+                fileId=spreadsheet_id,
                 fields="id, name, mimeType, webViewLink, createdTime"
             ).execute()
             
@@ -458,11 +490,13 @@ class GoogleDriveService:
                     "name": created_sheet['name'],
                     "mime_type": created_sheet['mimeType'],
                     "web_view_link": created_sheet.get('webViewLink', ''),
-                    "created_time": created_sheet.get('createdTime', '')
+                    "created_time": created_sheet.get('createdTime', ''),
+                    "data_added": data_added,
+                    "rows_added": len(data) if data else 0
                 }
             }
             
-            debug_print("✅ DEBUG [GDrive]: Spreadsheet created successfully")
+            debug_print("✅ DEBUG [GDrive]: Spreadsheet creation completed")
             return result
             
         except HttpError as error:
@@ -628,6 +662,7 @@ def main():
         elif action == "create_spreadsheet":
             result = gdrive_service.create_spreadsheet(
                 title=params.get("title"),
+                data=params.get("data"),
                 folder_id=params.get("folder_id")
             )
         elif action == "create_presentation":
