@@ -681,62 +681,94 @@ class GoogleDriveService:
             # Get current presentation to find existing slide
             presentation = self.slides_service.presentations().get(presentationId=presentation_id).execute()
             existing_slides = presentation.get('slides', [])
+            debug_print(f"🎯 DEBUG [GDrive]: Found {len(existing_slides)} existing slides")
             
-            requests = []
+            # First, set the layout of the first slide to TITLE_AND_BODY if it's not already
+            if existing_slides:
+                first_slide_id = existing_slides[0]['objectId']
+                debug_print(f"🎯 DEBUG [GDrive]: First slide ID: {first_slide_id}")
+                
+                # Update first slide layout to ensure it has title and body placeholders
+                layout_request = [{
+                    'updateSlideProperties': {
+                        'objectId': first_slide_id,
+                        'slideProperties': {
+                            'layoutObjectId': presentation['layouts'][1]['objectId']  # TITLE_AND_BODY layout
+                        },
+                        'fields': 'layoutObjectId'
+                    }
+                }]
+                
+                try:
+                    self.slides_service.presentations().batchUpdate(
+                        presentationId=presentation_id,
+                        body={'requests': layout_request}
+                    ).execute()
+                    debug_print(f"🎯 DEBUG [GDrive]: Updated first slide layout")
+                except Exception as e:
+                    debug_print(f"⚠️ DEBUG [GDrive]: Could not update first slide layout: {e}")
             
-            for i, slide_data in enumerate(slides_data):
-                slide_title = slide_data.get('title', f'Slide {i+1}')
-                slide_content = slide_data.get('content', '')
-                
-                debug_print(f"🎯 DEBUG [GDrive]: Processing slide {i+1}: {slide_title}")
-                
-                # Create new slide if needed (first slide already exists)
-                if i > 0:
-                    # Create new slide
-                    requests.append({
-                        'createSlide': {
-                            'slideLayoutReference': {
-                                'predefinedLayout': 'TITLE_AND_BODY'
-                            }
+            # Create additional slides if needed (we have one slide already)
+            new_slide_requests = []
+            slides_needed = len(slides_data)
+            slides_to_create = max(0, slides_needed - len(existing_slides))
+            
+            debug_print(f"🎯 DEBUG [GDrive]: Need {slides_needed} slides, have {len(existing_slides)}, creating {slides_to_create}")
+            
+            for i in range(slides_to_create):
+                new_slide_requests.append({
+                    'createSlide': {
+                        'slideLayoutReference': {
+                            'predefinedLayout': 'TITLE_AND_BODY'
                         }
-                    })
-                
-                # We'll add text after slide creation
+                    }
+                })
             
-            # Execute slide creation requests first
-            if requests:
-                debug_print(f"🎯 DEBUG [GDrive]: Creating {len(requests)} new slides")
+            # Execute slide creation requests
+            if new_slide_requests:
+                debug_print(f"🎯 DEBUG [GDrive]: Creating {len(new_slide_requests)} new slides")
                 self.slides_service.presentations().batchUpdate(
                     presentationId=presentation_id,
-                    body={'requests': requests}
+                    body={'requests': new_slide_requests}
                 ).execute()
             
-            # Get updated presentation with new slides
+            # Get updated presentation with all slides
             presentation = self.slides_service.presentations().get(presentationId=presentation_id).execute()
             slides = presentation.get('slides', [])
+            debug_print(f"🎯 DEBUG [GDrive]: Now have {len(slides)} total slides")
             
             # Add content to each slide
             text_requests = []
             for i, slide_data in enumerate(slides_data):
                 if i >= len(slides):
+                    debug_print(f"⚠️ DEBUG [GDrive]: Skipping slide {i+1}, not enough slides available")
                     break
                     
                 slide_id = slides[i]['objectId']
                 slide_title = slide_data.get('title', f'Slide {i+1}')
                 slide_content = slide_data.get('content', '')
                 
-                # Find title and body placeholders
+                debug_print(f"🎯 DEBUG [GDrive]: Processing slide {i+1}: '{slide_title}' (ID: {slide_id})")
+                
+                # Find title and body placeholders in current slide
                 slide_elements = slides[i].get('pageElements', [])
                 title_placeholder = None
                 body_placeholder = None
                 
+                debug_print(f"🎯 DEBUG [GDrive]: Slide {i+1} has {len(slide_elements)} elements")
+                
                 for element in slide_elements:
                     if element.get('shape') and element['shape'].get('placeholder'):
                         placeholder_type = element['shape']['placeholder'].get('type')
+                        element_id = element['objectId']
+                        debug_print(f"🎯 DEBUG [GDrive]: Found placeholder type '{placeholder_type}' with ID: {element_id}")
+                        
                         if placeholder_type == 'TITLE':
-                            title_placeholder = element['objectId']
+                            title_placeholder = element_id
                         elif placeholder_type == 'BODY':
-                            body_placeholder = element['objectId']
+                            body_placeholder = element_id
+                
+                debug_print(f"🎯 DEBUG [GDrive]: Slide {i+1} - Title placeholder: {title_placeholder}, Body placeholder: {body_placeholder}")
                 
                 # Add title text
                 if title_placeholder and slide_title:
@@ -746,6 +778,7 @@ class GoogleDriveService:
                             'text': slide_title
                         }
                     })
+                    debug_print(f"🎯 DEBUG [GDrive]: Added title text request for slide {i+1}")
                 
                 # Add body text  
                 if body_placeholder and slide_content:
@@ -755,20 +788,94 @@ class GoogleDriveService:
                             'text': slide_content
                         }
                     })
+                    debug_print(f"🎯 DEBUG [GDrive]: Added body text request for slide {i+1}")
+                
+                # If no placeholders found, create text boxes manually
+                if not title_placeholder and not body_placeholder:
+                    debug_print(f"⚠️ DEBUG [GDrive]: No placeholders found for slide {i+1}, creating manual text boxes")
+                    
+                    # Create title text box
+                    if slide_title:
+                        title_box_id = f"title_box_{i}"
+                        text_requests.extend([
+                            {
+                                'createShape': {
+                                    'objectId': title_box_id,
+                                    'shapeType': 'TEXT_BOX',
+                                    'elementProperties': {
+                                        'pageObjectId': slide_id,
+                                        'size': {
+                                            'width': {'magnitude': 720, 'unit': 'PT'},
+                                            'height': {'magnitude': 100, 'unit': 'PT'}
+                                        },
+                                        'transform': {
+                                            'scaleX': 1,
+                                            'scaleY': 1,
+                                            'translateX': 50,
+                                            'translateY': 50,
+                                            'unit': 'PT'
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                'insertText': {
+                                    'objectId': title_box_id,
+                                    'text': slide_title
+                                }
+                            }
+                        ])
+                    
+                    # Create body text box
+                    if slide_content:
+                        body_box_id = f"body_box_{i}"
+                        text_requests.extend([
+                            {
+                                'createShape': {
+                                    'objectId': body_box_id,
+                                    'shapeType': 'TEXT_BOX',
+                                    'elementProperties': {
+                                        'pageObjectId': slide_id,
+                                        'size': {
+                                            'width': {'magnitude': 720, 'unit': 'PT'},
+                                            'height': {'magnitude': 400, 'unit': 'PT'}
+                                        },
+                                        'transform': {
+                                            'scaleX': 1,
+                                            'scaleY': 1,
+                                            'translateX': 50,
+                                            'translateY': 180,
+                                            'unit': 'PT'
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                'insertText': {
+                                    'objectId': body_box_id,
+                                    'text': slide_content
+                                }
+                            }
+                        ])
             
-            # Execute text insertion requests
+            # Execute all text insertion requests
             if text_requests:
-                debug_print(f"🎯 DEBUG [GDrive]: Adding text to slides")
+                debug_print(f"🎯 DEBUG [GDrive]: Executing {len(text_requests)} text requests")
                 self.slides_service.presentations().batchUpdate(
                     presentationId=presentation_id,
                     body={'requests': text_requests}
                 ).execute()
+                debug_print(f"✅ DEBUG [GDrive]: Successfully added all text content")
+            else:
+                debug_print(f"⚠️ DEBUG [GDrive]: No text requests to execute")
             
-            debug_print(f"✅ DEBUG [GDrive]: Successfully added content to {len(slides_data)} slides")
+            debug_print(f"✅ DEBUG [GDrive]: Successfully processed {len(slides_data)} slides")
             return True
             
         except Exception as e:
             debug_print(f"❌ DEBUG [GDrive]: Error adding slides content: {e}")
+            import traceback
+            debug_print(f"❌ DEBUG [GDrive]: Full traceback: {traceback.format_exc()}")
             return False
 
     def create_text_file(self, title: str, content: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
