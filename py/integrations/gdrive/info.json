@@ -118,12 +118,22 @@
             "name": "create_spreadsheet",
             "description": "Create a new Google Sheets spreadsheet with optional data",
             "parameters": {
-                "title": {
+                                "title": {
                     "type": "string",
                     "description": "Spreadsheet title",
                     "required": true
                 },
-
+                "data": {
+                    "type": "array",
+                    "description": "2D array of data to populate the spreadsheet",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "optional": true
+                },
                 "folder_id": {
                     "type": "string",
                     "description": "Folder ID to create spreadsheet in (optional)",

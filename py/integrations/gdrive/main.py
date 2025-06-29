@@ -435,6 +435,53 @@ class GoogleDriveService:
             if data:
                 debug_print(f"📊 DEBUG [GDrive]: Data rows: {len(data)}")
             
+            # Check if spreadsheet with same name already exists
+            debug_print(f"🔍 DEBUG [GDrive]: Checking for existing spreadsheet with name: {title}")
+            search_query = f"name='{title}' and mimeType='application/vnd.google-apps.spreadsheet'"
+            if folder_id:
+                search_query += f" and '{folder_id}' in parents"
+            
+            existing_files = self.service.files().list(
+                q=search_query,
+                pageSize=1,
+                fields="files(id, name, webViewLink, createdTime)"
+            ).execute()
+            
+            if existing_files.get('files'):
+                existing_file = existing_files['files'][0]
+                debug_print(f"⚠️ DEBUG [GDrive]: Spreadsheet already exists, returning existing one")
+                
+                # Add data to existing spreadsheet if provided
+                data_added = False
+                if data and len(data) > 0:
+                    try:
+                        debug_print(f"📊 DEBUG [GDrive]: Adding data to existing spreadsheet")
+                        body = {'values': data}
+                        result = self.sheets_service.spreadsheets().values().update(
+                            spreadsheetId=existing_file['id'],
+                            range='Sheet1!A1',
+                            valueInputOption='RAW',
+                            body=body
+                        ).execute()
+                        debug_print(f"✅ DEBUG [GDrive]: Data added to existing spreadsheet: {result.get('updatedCells', 0)} cells updated")
+                        data_added = True
+                    except Exception as e:
+                        debug_print(f"❌ DEBUG [GDrive]: Failed to add data to existing: {e}")
+                
+                return {
+                    "status": "success",
+                    "spreadsheet": {
+                        "id": existing_file['id'],
+                        "name": existing_file['name'],
+                        "mime_type": 'application/vnd.google-apps.spreadsheet',
+                        "web_view_link": existing_file.get('webViewLink', ''),
+                        "created_time": existing_file.get('createdTime', ''),
+                        "data_added": data_added,
+                        "rows_added": len(data) if data else 0,
+                        "note": "Used existing spreadsheet with same name"
+                    }
+                }
+            
             # Create the spreadsheet metadata
             file_metadata = {
                 'name': title,
