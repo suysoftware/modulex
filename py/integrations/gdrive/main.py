@@ -456,10 +456,17 @@ class GoogleDriveService:
                 if data and len(data) > 0:
                     try:
                         debug_print(f"📊 DEBUG [GDrive]: Adding data to existing spreadsheet")
-                        body = {'values': data}
+                        
+                        # Convert all values to strings for existing spreadsheet too
+                        converted_data = []
+                        for row in data:
+                            converted_row = [str(cell) for cell in row]
+                            converted_data.append(converted_row)
+                        
+                        body = {'values': converted_data}
                         result = self.sheets_service.spreadsheets().values().update(
                             spreadsheetId=existing_file['id'],
-                            range='Sheet1!A1',
+                            range='A1',
                             valueInputOption='RAW',
                             body=body
                         ).execute()
@@ -504,15 +511,29 @@ class GoogleDriveService:
                 try:
                     debug_print(f"📊 DEBUG [GDrive]: Adding data to spreadsheet")
                     
-                    # Prepare the data for Sheets API
+                    # Prepare the data for Sheets API - ensure all values are strings
+                    debug_print(f"📊 DEBUG [GDrive]: Data sample before conversion: {data[:2] if len(data) > 1 else data}")
+                    
+                    # Convert all values to strings
+                    converted_data = []
+                    for row in data:
+                        converted_row = [str(cell) for cell in row]
+                        converted_data.append(converted_row)
+                    
+                    debug_print(f"📊 DEBUG [GDrive]: Data sample after string conversion: {converted_data[:2] if len(converted_data) > 1 else converted_data}")
+                    
                     body = {
-                        'values': data
+                        'values': converted_data
                     }
+                    debug_print(f"📊 DEBUG [GDrive]: Body prepared for Sheets API with {len(converted_data)} rows")
                     
                     # Update the spreadsheet with data
+                    range_name = 'A1'  # Simple range without sheet name
+                    debug_print(f"📊 DEBUG [GDrive]: Using range: {range_name}")
+                    
                     result = self.sheets_service.spreadsheets().values().update(
                         spreadsheetId=spreadsheet_id,
-                        range='Sheet1!A1',
+                        range=range_name,
                         valueInputOption='RAW',
                         body=body
                     ).execute()
