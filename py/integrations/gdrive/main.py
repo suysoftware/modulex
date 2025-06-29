@@ -319,14 +319,19 @@ class GoogleDriveService:
                         }
                     ]
                     
-                    self.docs_service.documents().batchUpdate(
+                    result = self.docs_service.documents().batchUpdate(
                         documentId=document_id,
                         body={'requests': requests}
                     ).execute()
                     
                     debug_print("✅ DEBUG [GDrive]: Content added to document successfully")
-                except HttpError as e:
+                    debug_print(f"🔍 DEBUG [GDrive]: Batch update result: {result}")
+                    
+                except Exception as e:
                     debug_print(f"⚠️ DEBUG [GDrive]: Content addition failed: {e}")
+                    debug_print(f"🔍 DEBUG [GDrive]: Document ID: {document_id}")
+                    debug_print(f"🔍 DEBUG [GDrive]: Content length: {len(content)}")
+                    # If content addition fails, we still return success for document creation
             
             # Get the created document details
             created_doc = self.service.files().get(
