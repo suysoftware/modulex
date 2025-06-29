@@ -287,11 +287,12 @@ class GoogleDriveService:
     def create_document(self, title: str, content: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
         """Create a new Google Docs document with content"""
         try:
-            debug_print(f"📝 DEBUG [GDrive]: Creating document: {title}")
+            debug_print(f"📝 DEBUG [GDrive]: Creating document with title: '{title}'")
+            debug_print(f"📝 DEBUG [GDrive]: Content length: {len(content) if content else 0}")
             
-            # Create the document metadata
+            # Create the document metadata with explicit name
             file_metadata = {
-                'name': title,
+                'name': title if title else 'Untitled Document',
                 'mimeType': 'application/vnd.google-apps.document'
             }
             
@@ -299,107 +300,110 @@ class GoogleDriveService:
             if folder_id:
                 file_metadata['parents'] = [folder_id]
             
-            # Create the document
-            doc = self.service.files().create(body=file_metadata).execute()
-            document_id = doc.get('id')
+            debug_print(f"🔍 DEBUG [GDrive]: File metadata: {json.dumps(file_metadata, indent=2)}")
             
+            # Create the document
+            doc = self.service.files().create(
+                body=file_metadata,
+                fields='id,name,mimeType,webViewLink'
+            ).execute()
+            
+            document_id = doc.get('id')
             debug_print(f"📄 DEBUG [GDrive]: Document created with ID: {document_id}")
+            debug_print(f"📄 DEBUG [GDrive]: Document name from API: {doc.get('name')}")
             
             # Add content to the document using Google Docs API
-            if content:
+            content_added = False
+            if content and content.strip():
                 try:
                     debug_print(f"📝 DEBUG [GDrive]: Attempting to add content to document {document_id}")
-                    debug_print(f"📝 DEBUG [GDrive]: Content to add: {content[:100]}...")
+                    debug_print(f"📝 DEBUG [GDrive]: Content preview: {content[:100]}...")
                     
-                    # First, get the current document structure
-                    current_doc = self.docs_service.documents().get(documentId=document_id).execute()
-                    debug_print(f"🔍 DEBUG [GDrive]: Current document structure: {json.dumps(current_doc.get('body', {}), indent=2)}")
+                    # Wait a moment for document to be ready
+                    import time
+                    time.sleep(0.5)
                     
-                    # Find the correct insertion point (end of document)
-                    body = current_doc.get('body', {})
-                    content_elements = body.get('content', [])
-                    
-                    # Calculate the end index
-                    end_index = 1  # Start with default
-                    for element in content_elements:
-                        if 'endIndex' in element:
-                            end_index = element['endIndex']
-                    
-                    debug_print(f"🔍 DEBUG [GDrive]: Calculated end index: {end_index}")
-                    
-                    # Insert text at the calculated position
+                    # Simple approach - insert at beginning
                     requests = [
                         {
                             'insertText': {
                                 'location': {
-                                    'index': end_index - 1,  # Insert before the final newline
+                                    'index': 1,
                                 },
                                 'text': content
                             }
                         }
                     ]
                     
-                    debug_print(f"🔍 DEBUG [GDrive]: Batch update request: {json.dumps(requests, indent=2)}")
+                    debug_print(f"🔍 DEBUG [GDrive]: Inserting text at index 1")
                     
                     result = self.docs_service.documents().batchUpdate(
                         documentId=document_id,
                         body={'requests': requests}
                     ).execute()
                     
-                    debug_print("✅ DEBUG [GDrive]: Content added to document successfully")
+                    debug_print("✅ DEBUG [GDrive]: Content added successfully")
                     debug_print(f"🔍 DEBUG [GDrive]: Batch update result: {result}")
+                    content_added = True
                     
                 except Exception as e:
-                    debug_print(f"❌ DEBUG [GDrive]: Content addition failed with error: {e}")
-                    debug_print(f"🔍 DEBUG [GDrive]: Error type: {type(e)}")
-                    debug_print(f"🔍 DEBUG [GDrive]: Document ID: {document_id}")
-                    debug_print(f"🔍 DEBUG [GDrive]: Content length: {len(content)}")
+                    debug_print(f"❌ DEBUG [GDrive]: Content addition failed: {e}")
+                    debug_print(f"🔍 DEBUG [GDrive]: Error details: {str(e)}")
                     
-                    # Try a simpler approach - insert at index 1
+                    # Alternative approach - try with different index
                     try:
-                        debug_print("🔄 DEBUG [GDrive]: Trying simple insertion at index 1")
-                        simple_requests = [
+                        debug_print("🔄 DEBUG [GDrive]: Trying alternative approach...")
+                        
+                        # Get document structure first
+                        current_doc = self.docs_service.documents().get(documentId=document_id).execute()
+                        debug_print(f"📄 DEBUG [GDrive]: Document title from Docs API: {current_doc.get('title', 'No title')}")
+                        
+                        # Try inserting at the very beginning
+                        alt_requests = [
                             {
                                 'insertText': {
                                     'location': {
                                         'index': 1,
                                     },
-                                    'text': content
+                                    'text': content + '\n'
                                 }
                             }
                         ]
                         
-                        simple_result = self.docs_service.documents().batchUpdate(
+                        alt_result = self.docs_service.documents().batchUpdate(
                             documentId=document_id,
-                            body={'requests': simple_requests}
+                            body={'requests': alt_requests}
                         ).execute()
                         
-                        debug_print("✅ DEBUG [GDrive]: Simple insertion successful")
-                        debug_print(f"🔍 DEBUG [GDrive]: Simple result: {simple_result}")
+                        debug_print("✅ DEBUG [GDrive]: Alternative content insertion successful")
+                        content_added = True
                         
-                    except Exception as simple_e:
-                        debug_print(f"❌ DEBUG [GDrive]: Simple insertion also failed: {simple_e}")
-                        # If content addition fails, we still return success for document creation
+                    except Exception as alt_e:
+                        debug_print(f"❌ DEBUG [GDrive]: Alternative approach also failed: {alt_e}")
+                        content_added = False
             
-            # Get the created document details
-            created_doc = self.service.files().get(
+            # Get the final document details
+            final_doc = self.service.files().get(
                 fileId=document_id,
                 fields="id, name, mimeType, webViewLink, createdTime"
             ).execute()
             
+            debug_print(f"📄 DEBUG [GDrive]: Final document name: {final_doc.get('name')}")
+            
             result = {
                 "status": "success",
                 "document": {
-                    "id": created_doc['id'],
-                    "name": created_doc['name'],
-                    "mime_type": created_doc['mimeType'],
-                    "web_view_link": created_doc.get('webViewLink', ''),
-                    "created_time": created_doc.get('createdTime', ''),
-                    "content_added": bool(content)
+                    "id": final_doc['id'],
+                    "name": final_doc['name'],
+                    "mime_type": final_doc['mimeType'],
+                    "web_view_link": final_doc.get('webViewLink', ''),
+                    "created_time": final_doc.get('createdTime', ''),
+                    "content_added": content_added,
+                    "requested_title": title
                 }
             }
             
-            debug_print("✅ DEBUG [GDrive]: Document created successfully")
+            debug_print("✅ DEBUG [GDrive]: Document creation completed")
             return result
             
         except HttpError as error:
