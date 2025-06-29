@@ -722,13 +722,11 @@ def main():
                 file_id=params.get("file_id")
             )
         elif action == "create_document":
-            debug_print(f"📄 DEBUG [GDrive]: Document creation temporarily disabled for testing")
-            result = {"status": "error", "error_message": "Document creation temporarily disabled for spreadsheet testing"}
-            # result = gdrive_service.create_document(
-            #     title=params.get("title"),
-            #     content=params.get("content"),
-            #     folder_id=params.get("folder_id")
-            # )
+            result = gdrive_service.create_document(
+                title=params.get("title"),
+                content=params.get("content"),
+                folder_id=params.get("folder_id")
+            )
         elif action == "create_spreadsheet":
             # Parse data from JSON string if provided
             data = params.get("data")
