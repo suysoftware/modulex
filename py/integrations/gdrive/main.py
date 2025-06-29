@@ -308,16 +308,38 @@ class GoogleDriveService:
             # Add content to the document using Google Docs API
             if content:
                 try:
+                    debug_print(f"📝 DEBUG [GDrive]: Attempting to add content to document {document_id}")
+                    debug_print(f"📝 DEBUG [GDrive]: Content to add: {content[:100]}...")
+                    
+                    # First, get the current document structure
+                    current_doc = self.docs_service.documents().get(documentId=document_id).execute()
+                    debug_print(f"🔍 DEBUG [GDrive]: Current document structure: {json.dumps(current_doc.get('body', {}), indent=2)}")
+                    
+                    # Find the correct insertion point (end of document)
+                    body = current_doc.get('body', {})
+                    content_elements = body.get('content', [])
+                    
+                    # Calculate the end index
+                    end_index = 1  # Start with default
+                    for element in content_elements:
+                        if 'endIndex' in element:
+                            end_index = element['endIndex']
+                    
+                    debug_print(f"🔍 DEBUG [GDrive]: Calculated end index: {end_index}")
+                    
+                    # Insert text at the calculated position
                     requests = [
                         {
                             'insertText': {
                                 'location': {
-                                    'index': 1,
+                                    'index': end_index - 1,  # Insert before the final newline
                                 },
                                 'text': content
                             }
                         }
                     ]
+                    
+                    debug_print(f"🔍 DEBUG [GDrive]: Batch update request: {json.dumps(requests, indent=2)}")
                     
                     result = self.docs_service.documents().batchUpdate(
                         documentId=document_id,
@@ -328,10 +350,36 @@ class GoogleDriveService:
                     debug_print(f"🔍 DEBUG [GDrive]: Batch update result: {result}")
                     
                 except Exception as e:
-                    debug_print(f"⚠️ DEBUG [GDrive]: Content addition failed: {e}")
+                    debug_print(f"❌ DEBUG [GDrive]: Content addition failed with error: {e}")
+                    debug_print(f"🔍 DEBUG [GDrive]: Error type: {type(e)}")
                     debug_print(f"🔍 DEBUG [GDrive]: Document ID: {document_id}")
                     debug_print(f"🔍 DEBUG [GDrive]: Content length: {len(content)}")
-                    # If content addition fails, we still return success for document creation
+                    
+                    # Try a simpler approach - insert at index 1
+                    try:
+                        debug_print("🔄 DEBUG [GDrive]: Trying simple insertion at index 1")
+                        simple_requests = [
+                            {
+                                'insertText': {
+                                    'location': {
+                                        'index': 1,
+                                    },
+                                    'text': content
+                                }
+                            }
+                        ]
+                        
+                        simple_result = self.docs_service.documents().batchUpdate(
+                            documentId=document_id,
+                            body={'requests': simple_requests}
+                        ).execute()
+                        
+                        debug_print("✅ DEBUG [GDrive]: Simple insertion successful")
+                        debug_print(f"🔍 DEBUG [GDrive]: Simple result: {simple_result}")
+                        
+                    except Exception as simple_e:
+                        debug_print(f"❌ DEBUG [GDrive]: Simple insertion also failed: {simple_e}")
+                        # If content addition fails, we still return success for document creation
             
             # Get the created document details
             created_doc = self.service.files().get(
