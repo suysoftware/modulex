@@ -124,14 +124,8 @@
                     "required": true
                 },
                 "data": {
-                    "type": "array",
-                    "description": "2D array of data to populate the spreadsheet",
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
+                    "type": "string",
+                    "description": "JSON string of 2D array data to populate the spreadsheet",
                     "optional": true
                 },
                 "folder_id": {

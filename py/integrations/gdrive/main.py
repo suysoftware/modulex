@@ -707,9 +707,18 @@ def main():
                 folder_id=params.get("folder_id")
             )
         elif action == "create_spreadsheet":
+            # Parse data from JSON string if provided
+            data = params.get("data")
+            if data and isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError:
+                    data = None
+                    debug_print(f"❌ DEBUG [GDrive]: Invalid JSON in data parameter")
+            
             result = gdrive_service.create_spreadsheet(
                 title=params.get("title"),
-                data=params.get("data"),
+                data=data,
                 folder_id=params.get("folder_id")
             )
         elif action == "create_presentation":
