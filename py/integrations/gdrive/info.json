@@ -1,7 +1,7 @@
 {
     "name": "gdrive",
-    "display_name": "Google Drive",
-    "description": "Google Drive integration for managing files and folders",
+    "display_name": "Google Drive & Docs",
+    "description": "Google Drive & Docs integration for managing files and folders",
     "version": "1.0.0",
     "author": "ModuleX",
     "requires_auth": true,
