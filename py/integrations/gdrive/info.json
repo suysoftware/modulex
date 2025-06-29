@@ -137,12 +137,17 @@
         },
         {
             "name": "create_presentation",
-            "description": "Create a new Google Slides presentation",
+            "description": "Create a new Google Slides presentation with optional slides content",
             "parameters": {
                 "title": {
                     "type": "string",
                     "description": "Presentation title",
                     "required": true
+                },
+                "slides_data": {
+                    "type": "string",
+                    "description": "JSON string of slides data - array of objects with 'title' and 'content' fields",
+                    "optional": true
                 },
                 "folder_id": {
                     "type": "string",

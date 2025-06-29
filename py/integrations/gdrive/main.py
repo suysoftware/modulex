@@ -33,7 +33,8 @@ class GoogleDriveService:
             'https://www.googleapis.com/auth/drive.file',
             'https://www.googleapis.com/auth/docs',
             'https://www.googleapis.com/auth/documents',
-            'https://www.googleapis.com/auth/spreadsheets'
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/presentations'
         ]
         
         if not self.client_id:
@@ -51,6 +52,7 @@ class GoogleDriveService:
         self.service = self._get_service()
         self.docs_service = self._get_docs_service()
         self.sheets_service = self._get_sheets_service()
+        self.slides_service = self._get_slides_service()
         
         debug_print("✅ DEBUG [GDrive]: Service initialized successfully")
 
@@ -93,6 +95,15 @@ class GoogleDriveService:
         except HttpError as error:
             debug_print(f'❌ DEBUG [GDrive]: Error building Sheets service: {error}')
             raise ValueError(f'Google Sheets service error: {error}')
+
+    def _get_slides_service(self):
+        """Initialize Google Slides API service"""
+        try:
+            service = build('slides', 'v1', credentials=self.credentials)
+            return service
+        except HttpError as error:
+            debug_print(f'❌ DEBUG [GDrive]: Error building Slides service: {error}')
+            raise ValueError(f'Google Slides service error: {error}')
 
     def search_files(self, query: str, page_size: int = 10) -> Dict[str, Any]:
         """Search for files in Google Drive"""
@@ -571,27 +582,74 @@ class GoogleDriveService:
             debug_print(f"❌ DEBUG [GDrive]: Create spreadsheet error: {error}")
             return {"status": "error", "error_message": str(error)}
 
-    def create_presentation(self, title: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
-        """Create a new Google Slides presentation"""
+    def create_presentation(self, title: str, slides_data: Optional[List[Dict]] = None, folder_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new Google Slides presentation with optional slides content"""
         try:
             debug_print(f"🎯 DEBUG [GDrive]: Creating presentation: {title}")
+            debug_print(f"🎯 DEBUG [GDrive]: Slides data provided: {bool(slides_data)}")
+            if slides_data:
+                debug_print(f"🎯 DEBUG [GDrive]: Number of slides: {len(slides_data)}")
             
-            # Create the presentation metadata
-            file_metadata = {
-                'name': title,
-                'mimeType': 'application/vnd.google-apps.presentation'
+            # Check if presentation with same name already exists
+            debug_print(f"🔍 DEBUG [GDrive]: Checking for existing presentation with name: {title}")
+            search_query = f"name='{title}' and mimeType='application/vnd.google-apps.presentation'"
+            if folder_id:
+                search_query += f" and '{folder_id}' in parents"
+            
+            existing_files = self.service.files().list(
+                q=search_query,
+                pageSize=1,
+                fields="files(id, name, webViewLink, createdTime)"
+            ).execute()
+            
+            if existing_files.get('files'):
+                existing_file = existing_files['files'][0]
+                debug_print(f"⚠️ DEBUG [GDrive]: Presentation already exists, returning existing one")
+                
+                return {
+                    "status": "success",
+                    "presentation": {
+                        "id": existing_file['id'],
+                        "name": existing_file['name'],
+                        "mime_type": 'application/vnd.google-apps.presentation',
+                        "web_view_link": existing_file.get('webViewLink', ''),
+                        "created_time": existing_file.get('createdTime', ''),
+                        "slides_added": False,
+                        "note": "Used existing presentation with same name"
+                    }
+                }
+            
+            # Create the presentation using Slides API
+            presentation_body = {
+                'title': title
             }
             
-            # Add to specific folder if provided
-            if folder_id:
-                file_metadata['parents'] = [folder_id]
+            # Create presentation via Slides API to get better access
+            presentation = self.slides_service.presentations().create(body=presentation_body).execute()
+            presentation_id = presentation['presentationId']
             
-            # Create the presentation
-            presentation = self.service.files().create(body=file_metadata).execute()
+            debug_print(f"🎯 DEBUG [GDrive]: Presentation created with ID: {presentation_id}")
+            
+            # Move to specific folder if provided
+            if folder_id:
+                self.service.files().update(
+                    fileId=presentation_id,
+                    addParents=folder_id,
+                    fields='id, parents'
+                ).execute()
+            
+            # Add slides content if provided
+            slides_added = False
+            if slides_data and len(slides_data) > 0:
+                try:
+                    debug_print(f"🎯 DEBUG [GDrive]: Adding slides content")
+                    slides_added = self._add_slides_content(presentation_id, slides_data)
+                except Exception as e:
+                    debug_print(f"❌ DEBUG [GDrive]: Failed to add slides content: {e}")
             
             # Get the created presentation details
             created_presentation = self.service.files().get(
-                fileId=presentation['id'],
+                fileId=presentation_id,
                 fields="id, name, mimeType, webViewLink, createdTime"
             ).execute()
             
@@ -602,16 +660,116 @@ class GoogleDriveService:
                     "name": created_presentation['name'],
                     "mime_type": created_presentation['mimeType'],
                     "web_view_link": created_presentation.get('webViewLink', ''),
-                    "created_time": created_presentation.get('createdTime', '')
+                    "created_time": created_presentation.get('createdTime', ''),
+                    "slides_added": slides_added,
+                    "slides_count": len(slides_data) if slides_data else 0
                 }
             }
             
-            debug_print("✅ DEBUG [GDrive]: Presentation created successfully")
+            debug_print("✅ DEBUG [GDrive]: Presentation creation completed")
             return result
             
         except HttpError as error:
             debug_print(f"❌ DEBUG [GDrive]: Create presentation error: {error}")
             return {"status": "error", "error_message": str(error)}
+
+    def _add_slides_content(self, presentation_id: str, slides_data: List[Dict]) -> bool:
+        """Add content to slides in the presentation"""
+        try:
+            debug_print(f"🎯 DEBUG [GDrive]: Adding content to {len(slides_data)} slides")
+            
+            # Get current presentation to find existing slide
+            presentation = self.slides_service.presentations().get(presentationId=presentation_id).execute()
+            existing_slides = presentation.get('slides', [])
+            
+            requests = []
+            
+            for i, slide_data in enumerate(slides_data):
+                slide_title = slide_data.get('title', f'Slide {i+1}')
+                slide_content = slide_data.get('content', '')
+                
+                debug_print(f"🎯 DEBUG [GDrive]: Processing slide {i+1}: {slide_title}")
+                
+                # Create new slide if needed (first slide already exists)
+                if i > 0:
+                    # Create new slide
+                    requests.append({
+                        'createSlide': {
+                            'slideLayoutReference': {
+                                'predefinedLayout': 'TITLE_AND_BODY'
+                            }
+                        }
+                    })
+                
+                # We'll add text after slide creation
+            
+            # Execute slide creation requests first
+            if requests:
+                debug_print(f"🎯 DEBUG [GDrive]: Creating {len(requests)} new slides")
+                self.slides_service.presentations().batchUpdate(
+                    presentationId=presentation_id,
+                    body={'requests': requests}
+                ).execute()
+            
+            # Get updated presentation with new slides
+            presentation = self.slides_service.presentations().get(presentationId=presentation_id).execute()
+            slides = presentation.get('slides', [])
+            
+            # Add content to each slide
+            text_requests = []
+            for i, slide_data in enumerate(slides_data):
+                if i >= len(slides):
+                    break
+                    
+                slide_id = slides[i]['objectId']
+                slide_title = slide_data.get('title', f'Slide {i+1}')
+                slide_content = slide_data.get('content', '')
+                
+                # Find title and body placeholders
+                slide_elements = slides[i].get('pageElements', [])
+                title_placeholder = None
+                body_placeholder = None
+                
+                for element in slide_elements:
+                    if element.get('shape') and element['shape'].get('placeholder'):
+                        placeholder_type = element['shape']['placeholder'].get('type')
+                        if placeholder_type == 'TITLE':
+                            title_placeholder = element['objectId']
+                        elif placeholder_type == 'BODY':
+                            body_placeholder = element['objectId']
+                
+                # Add title text
+                if title_placeholder and slide_title:
+                    text_requests.append({
+                        'insertText': {
+                            'objectId': title_placeholder,
+                            'text': slide_title
+                        }
+                    })
+                
+                # Add body text  
+                if body_placeholder and slide_content:
+                    text_requests.append({
+                        'insertText': {
+                            'objectId': body_placeholder,
+                            'text': slide_content
+                        }
+                    })
+            
+            # Execute text insertion requests
+            if text_requests:
+                debug_print(f"🎯 DEBUG [GDrive]: Adding text to slides")
+                self.slides_service.presentations().batchUpdate(
+                    presentationId=presentation_id,
+                    body={'requests': text_requests}
+                ).execute()
+            
+            debug_print(f"✅ DEBUG [GDrive]: Successfully added content to {len(slides_data)} slides")
+            return True
+            
+        except Exception as e:
+            debug_print(f"❌ DEBUG [GDrive]: Error adding slides content: {e}")
+            return False
 
     def create_text_file(self, title: str, content: str, folder_id: Optional[str] = None) -> Dict[str, Any]:
         """Create a new plain text file"""
@@ -750,8 +908,25 @@ def main():
                 folder_id=params.get("folder_id")
             )
         elif action == "create_presentation":
+            # Parse slides data from JSON string if provided
+            slides_data = params.get("slides_data")
+            debug_print(f"🎯 DEBUG [GDrive]: Raw slides_data parameter: {slides_data} (type: {type(slides_data)})")
+            
+            if slides_data and isinstance(slides_data, str):
+                try:
+                    slides_data = json.loads(slides_data)
+                    debug_print(f"✅ DEBUG [GDrive]: Slides data parsed successfully: {len(slides_data) if slides_data else 0} slides")
+                except json.JSONDecodeError as e:
+                    debug_print(f"❌ DEBUG [GDrive]: JSON decode error for slides: {e}")
+                    slides_data = None
+            elif slides_data and isinstance(slides_data, list):
+                debug_print(f"✅ DEBUG [GDrive]: Slides data already a list: {len(slides_data)} slides")
+            else:
+                debug_print(f"🎯 DEBUG [GDrive]: No slides data provided or invalid format")
+            
             result = gdrive_service.create_presentation(
                 title=params.get("title"),
+                slides_data=slides_data,
                 folder_id=params.get("folder_id")
             )
         elif action == "create_text_file":
