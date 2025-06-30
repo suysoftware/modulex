@@ -516,90 +516,42 @@ async def register_manual_auth(
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
-@callback_router.get("/callback/{tool_name}", response_class=HTMLResponse)
+@callback_router.get("/callback/{tool_name}")
 async def auth_callback(
     tool_name: str,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db)
 ):
-    """Handle OAuth callback - Returns beautiful HTML page"""
+    """Handle OAuth callback - Returns JSON response"""
     auth_service = AuthService(db)
     
     try:
         # Handle traditional OAuth callback
         success = await auth_service.handle_callback(tool_name, code, state)
         if success:
-            return HTMLResponse(
-                content=get_success_html(tool_name), 
-                status_code=200, 
-                media_type="text/html",
-                headers={
-                    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
-                    "X-Frame-Options": "SAMEORIGIN"
-                }
-            )
+            return {"success": True, "message": f"Successfully authenticated with {tool_name}", "tool_name": tool_name}
         else:
-            return HTMLResponse(
-                content=get_error_html(tool_name, "Authentication process failed"), 
-                status_code=400, 
-                media_type="text/html",
-                headers={
-                    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
-                    "X-Frame-Options": "SAMEORIGIN"
-                }
-            )
+            raise HTTPException(status_code=400, detail="Authentication process failed")
     except ValueError as e:
-        return HTMLResponse(
-            content=get_error_html(tool_name, str(e)), 
-            status_code=400, 
-            media_type="text/html",
-            headers={
-                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
-                "X-Frame-Options": "SAMEORIGIN"
-            }
-        )
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        return HTMLResponse(
-            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
-            status_code=500, 
-            media_type="text/html",
-            headers={
-                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
-                "X-Frame-Options": "SAMEORIGIN"
-            }
-        )
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
-@callback_router.get("/callback/form/{tool_name}", response_class=HTMLResponse)
+@callback_router.get("/callback/form/{tool_name}")
 async def form_auth_callback(
     tool_name: str,
     user_id: str = Query(...),
     db: AsyncSession = Depends(get_db)
 ):
-    """Handle form-based auth success callback - Returns beautiful HTML page"""
+    """Handle form-based auth success callback - Returns JSON response"""
     try:
         # For form-based auth, credentials were already saved in form submit
-        # Just return success page
-        return HTMLResponse(
-            content=get_success_html(tool_name), 
-            status_code=200, 
-            media_type="text/html",
-            headers={
-                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
-                "X-Frame-Options": "SAMEORIGIN"
-            }
-        )
+        # Just return success response
+        return {"success": True, "message": f"Successfully authenticated with {tool_name}", "tool_name": tool_name, "user_id": user_id}
     except Exception as e:
-        return HTMLResponse(
-            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
-            status_code=500, 
-            media_type="text/html",
-            headers={
-                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
-                "X-Frame-Options": "SAMEORIGIN"
-            }
-        )
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
 @callback_router.get("/form/{tool_name}", response_class=HTMLResponse)
