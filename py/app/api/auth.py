@@ -2,7 +2,7 @@
 Authentication API Endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 from pydantic import BaseModel
@@ -18,15 +18,13 @@ callback_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 def get_success_html(tool_name: str) -> str:
-    """Generate success HTML page with auto-close and parent notification"""
+    """Generate success HTML page"""
     tool_display_names = {
         "github": "GitHub",
         "google": "Google",
         "slack": "Slack",
         "gitlab": "GitLab",
-        "bitbucket": "Bitbucket",
-        "gmail": "Gmail",
-        "gdrive": "Google Drive"
+        "bitbucket": "Bitbucket"
     }
     
     display_name = tool_display_names.get(tool_name, tool_name.title())
@@ -60,7 +58,7 @@ def get_success_html(tool_name: str) -> str:
                 border-radius: 16px;
                 box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
                 padding: 40px;
-                max-width: 400px;
+                max-width: 500px;
                 width: 100%;
                 text-align: center;
                 animation: slideUp 0.6s ease-out;
@@ -108,17 +106,24 @@ def get_success_html(tool_name: str) -> str:
             }}
             
             .title {{
-                font-size: 24px;
+                font-size: 28px;
                 font-weight: 700;
                 color: #1F2937;
                 margin-bottom: 12px;
             }}
             
             .subtitle {{
-                font-size: 14px;
+                font-size: 16px;
                 color: #6B7280;
-                margin-bottom: 24px;
+                margin-bottom: 32px;
                 line-height: 1.5;
+            }}
+            
+            .tool-info {{
+                background: #F3F4F6;
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 32px;
             }}
             
             .tool-name {{
@@ -134,10 +139,28 @@ def get_success_html(tool_name: str) -> str:
                 font-weight: 500;
             }}
             
-            .countdown {{
+            .close-button {{
+                background: #6366F1;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 32px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }}
+            
+            .close-button:hover {{
+                background: #5B21B6;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+            }}
+            
+            .footer {{
+                margin-top: 24px;
                 font-size: 12px;
                 color: #9CA3AF;
-                margin-top: 16px;
             }}
         </style>
     </head>
@@ -151,56 +174,31 @@ def get_success_html(tool_name: str) -> str:
             
             <h1 class="title">Authentication Successful!</h1>
             <p class="subtitle">
-                {display_name} has been successfully connected.
+                You have successfully connected your {display_name} account to ModuleX.
+                You can now close this window and return to your application.
             </p>
             
-            <div class="tool-name">{display_name}</div>
-            <div class="tool-status">✓ Successfully Connected</div>
+            <div class="tool-info">
+                <div class="tool-name">{display_name}</div>
+                <div class="tool-status">✓ Successfully Connected</div>
+            </div>
             
-            <div class="countdown">
-                This window will close automatically in <span id="countdown">3</span> seconds...
+            <button class="close-button" onclick="window.close()">
+                Close Window
+            </button>
+            
+            <div class="footer">
+                Powered by ModuleX • Authentication System
             </div>
         </div>
         
         <script>
-            // Notify parent window about successful authentication
-            if (window.opener) {{
-                try {{
-                    window.opener.postMessage({{
-                        type: 'AUTH_SUCCESS',
-                        tool_name: '{tool_name}',
-                        display_name: '{display_name}',
-                        timestamp: new Date().toISOString()
-                    }}, window.location.origin);
-                }} catch (e) {{
-                    console.log('Could not send message to parent window:', e);
-                }}
-            }}
-            
-            // Countdown and auto-close
-            let countdown = 3;
-            const countdownElement = document.getElementById('countdown');
-            
-            const timer = setInterval(() => {{
-                countdown--;
-                if (countdownElement) {{
-                    countdownElement.textContent = countdown;
-                }}
-                
-                if (countdown <= 0) {{
-                    clearInterval(timer);
-                    if (window.opener) {{
-                        window.close();
-                    }}
-                }}
-            }}, 1000);
-            
-            // Also close on click anywhere
-            document.addEventListener('click', () => {{
+            // Auto-close after 10 seconds if user doesn't close manually
+            setTimeout(() => {{
                 if (window.opener) {{
                     window.close();
                 }}
-            }});
+            }}, 10000);
         </script>
     </body>
     </html>
@@ -516,80 +514,30 @@ async def register_manual_auth(
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
-@callback_router.get("/callback/{tool_name}")
+@callback_router.get("/callback/{tool_name}", response_class=HTMLResponse)
 async def auth_callback(
     tool_name: str,
     code: str = Query(...),
     state: str = Query(...),
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Handle OAuth callback - Returns beautiful HTML page"""
     auth_service = AuthService(db)
     
-    # Check if request expects JSON (from edge function/proxy) or HTML (direct browser access)
-    accept_header = request.headers.get("accept", "")
-    is_json_request = "application/json" in accept_header or "supabase.co" in request.headers.get("referer", "")
-    
     try:
         # Handle traditional OAuth callback
         success = await auth_service.handle_callback(tool_name, code, state)
-        
-        if is_json_request:
-            # Return JSON for edge functions/proxy
-            if success:
-                return {
-                    "success": True,
-                    "tool_name": tool_name,
-                    "message": f"Successfully authenticated with {tool_name}",
-                    "redirect_html": get_success_html(tool_name)
-                }
-            else:
-                raise HTTPException(status_code=400, detail="Authentication process failed")
+        if success:
+            return HTMLResponse(content=get_success_html(tool_name), status_code=200)
         else:
-            # Return HTML for direct browser access
-            if success:
-                html_content = get_success_html(tool_name)
-                return Response(
-                    content=html_content,
-                    status_code=200,
-                    headers={
-                        "Content-Type": "text/html; charset=utf-8",
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        "Pragma": "no-cache",
-                        "Expires": "0"
-                    }
-                )
-            else:
-                html_content = get_error_html(tool_name, "Authentication process failed")
-                return Response(
-                    content=html_content,
-                    status_code=400,
-                    headers={"Content-Type": "text/html; charset=utf-8"}
-                )
+            return HTMLResponse(content=get_error_html(tool_name, "Authentication process failed"), status_code=400)
     except ValueError as e:
-        if is_json_request:
-            raise HTTPException(status_code=400, detail=str(e))
-        else:
-            html_content = get_error_html(tool_name, str(e))
-            return Response(
-                content=html_content,
-                status_code=400,
-                headers={"Content-Type": "text/html; charset=utf-8"}
-            )
+        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
     except Exception as e:
-        if is_json_request:
-            raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
-        else:
-            html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
-            return Response(
-                content=html_content,
-                status_code=500,
-                headers={"Content-Type": "text/html; charset=utf-8"}
-            )
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
 
 
-@callback_router.get("/callback/form/{tool_name}")
+@callback_router.get("/callback/form/{tool_name}", response_class=HTMLResponse)
 async def form_auth_callback(
     tool_name: str,
     user_id: str = Query(...),
@@ -599,22 +547,12 @@ async def form_auth_callback(
     try:
         # For form-based auth, credentials were already saved in form submit
         # Just return success page
-        html_content = get_success_html(tool_name)
-        return Response(
-            content=html_content,
-            status_code=200,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        return HTMLResponse(content=get_success_html(tool_name), status_code=200)
     except Exception as e:
-        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
-        return Response(
-            content=html_content,
-            status_code=500,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
 
 
-@callback_router.get("/form/{tool_name}")
+@callback_router.get("/form/{tool_name}", response_class=HTMLResponse)
 async def auth_form(
     tool_name: str,
     user_id: str = Query(...),
@@ -625,28 +563,14 @@ async def auth_form(
     
     try:
         form_html = await auth_service.generate_auth_form(user_id, tool_name)
-        return Response(
-            content=form_html,
-            status_code=200,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        return HTMLResponse(content=form_html, status_code=200)
     except ValueError as e:
-        html_content = get_error_html(tool_name, str(e))
-        return Response(
-            content=html_content,
-            status_code=400,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
     except Exception as e:
-        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
-        return Response(
-            content=html_content,
-            status_code=500,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
 
 
-@callback_router.post("/form/{tool_name}")
+@callback_router.post("/form/{tool_name}", response_class=HTMLResponse)
 async def handle_auth_form_submit(
     tool_name: str,
     request: Request,
@@ -672,34 +596,20 @@ async def handle_auth_form_submit(
         )
         
         if success:
-            html_content = get_success_html(tool_name)
-            return Response(
-                content=html_content,
-                status_code=200,
-                headers={"Content-Type": "text/html; charset=utf-8"}
+            return HTMLResponse(
+                content=get_success_html(tool_name),
+                status_code=200
             )
         else:
-            html_content = get_error_html(tool_name, "Failed to save credentials")
-            return Response(
-                content=html_content,
-                status_code=400,
-                headers={"Content-Type": "text/html; charset=utf-8"}
+            return HTMLResponse(
+                content=get_error_html(tool_name, "Failed to save credentials"),
+                status_code=400
             )
             
     except ValueError as e:
-        html_content = get_error_html(tool_name, str(e))
-        return Response(
-            content=html_content,
-            status_code=400,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
     except Exception as e:
-        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
-        return Response(
-            content=html_content,
-            status_code=500,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
 
 
 @router.get("/tools")
