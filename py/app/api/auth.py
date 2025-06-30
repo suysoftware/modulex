@@ -530,13 +530,29 @@ async def auth_callback(
         # Handle traditional OAuth callback
         success = await auth_service.handle_callback(tool_name, code, state)
         if success:
-            return HTMLResponse(content=get_success_html(tool_name), status_code=200)
+            return HTMLResponse(
+                content=get_success_html(tool_name), 
+                status_code=200, 
+                media_type="text/html; charset=utf-8"
+            )
         else:
-            return HTMLResponse(content=get_error_html(tool_name, "Authentication process failed"), status_code=400)
+            return HTMLResponse(
+                content=get_error_html(tool_name, "Authentication process failed"), 
+                status_code=400, 
+                media_type="text/html; charset=utf-8"
+            )
     except ValueError as e:
-        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
+        return HTMLResponse(
+            content=get_error_html(tool_name, str(e)), 
+            status_code=400, 
+            media_type="text/html; charset=utf-8"
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html; charset=utf-8"
+        )
 
 
 @callback_router.get("/callback/form/{tool_name}", response_class=HTMLResponse)
@@ -549,9 +565,17 @@ async def form_auth_callback(
     try:
         # For form-based auth, credentials were already saved in form submit
         # Just return success page
-        return HTMLResponse(content=get_success_html(tool_name), status_code=200)
+        return HTMLResponse(
+            content=get_success_html(tool_name), 
+            status_code=200, 
+            media_type="text/html; charset=utf-8"
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html; charset=utf-8"
+        )
 
 
 @callback_router.get("/form/{tool_name}", response_class=HTMLResponse)
@@ -565,11 +589,23 @@ async def auth_form(
     
     try:
         form_html = await auth_service.generate_auth_form(user_id, tool_name)
-        return HTMLResponse(content=form_html, status_code=200)
+        return HTMLResponse(
+            content=form_html, 
+            status_code=200, 
+            media_type="text/html; charset=utf-8"
+        )
     except ValueError as e:
-        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
+        return HTMLResponse(
+            content=get_error_html(tool_name, str(e)), 
+            status_code=400, 
+            media_type="text/html; charset=utf-8"
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html; charset=utf-8"
+        )
 
 
 @callback_router.post("/form/{tool_name}", response_class=HTMLResponse)
@@ -600,18 +636,28 @@ async def handle_auth_form_submit(
         if success:
             return HTMLResponse(
                 content=get_success_html(tool_name),
-                status_code=200
+                status_code=200,
+                media_type="text/html; charset=utf-8"
             )
         else:
             return HTMLResponse(
                 content=get_error_html(tool_name, "Failed to save credentials"),
-                status_code=400
+                status_code=400,
+                media_type="text/html; charset=utf-8"
             )
             
     except ValueError as e:
-        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400)
+        return HTMLResponse(
+            content=get_error_html(tool_name, str(e)), 
+            status_code=400, 
+            media_type="text/html; charset=utf-8"
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500)
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html; charset=utf-8"
+        )
 
 
 @router.get("/tools")
