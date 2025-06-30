@@ -2,7 +2,7 @@
 Authentication API Endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 from pydantic import BaseModel
@@ -516,7 +516,7 @@ async def register_manual_auth(
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
-@callback_router.get("/callback/{tool_name}", response_class=HTMLResponse)
+@callback_router.get("/callback/{tool_name}")
 async def auth_callback(
     tool_name: str,
     code: str = Query(...),
@@ -530,38 +530,41 @@ async def auth_callback(
         # Handle traditional OAuth callback
         success = await auth_service.handle_callback(tool_name, code, state)
         if success:
-            response = HTMLResponse(
-                content=get_success_html(tool_name), 
-                status_code=200
+            html_content = get_success_html(tool_name)
+            return Response(
+                content=html_content,
+                status_code=200,
+                headers={
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
             )
-            response.headers["Content-Type"] = "text/html; charset=utf-8"
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            return response
         else:
-            response = HTMLResponse(
-                content=get_error_html(tool_name, "Authentication process failed"), 
-                status_code=400
+            html_content = get_error_html(tool_name, "Authentication process failed")
+            return Response(
+                content=html_content,
+                status_code=400,
+                headers={"Content-Type": "text/html; charset=utf-8"}
             )
-            response.headers["Content-Type"] = "text/html; charset=utf-8"
-            return response
     except ValueError as e:
-        response = HTMLResponse(
-            content=get_error_html(tool_name, str(e)), 
-            status_code=400
+        html_content = get_error_html(tool_name, str(e))
+        return Response(
+            content=html_content,
+            status_code=400,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
     except Exception as e:
-        response = HTMLResponse(
-            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
-            status_code=500
+        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
+        return Response(
+            content=html_content,
+            status_code=500,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
 
 
-@callback_router.get("/callback/form/{tool_name}", response_class=HTMLResponse)
+@callback_router.get("/callback/form/{tool_name}")
 async def form_auth_callback(
     tool_name: str,
     user_id: str = Query(...),
@@ -571,22 +574,22 @@ async def form_auth_callback(
     try:
         # For form-based auth, credentials were already saved in form submit
         # Just return success page
-        response = HTMLResponse(
-            content=get_success_html(tool_name), 
-            status_code=200
+        html_content = get_success_html(tool_name)
+        return Response(
+            content=html_content,
+            status_code=200,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
     except Exception as e:
-        response = HTMLResponse(
-            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
-            status_code=500
+        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
+        return Response(
+            content=html_content,
+            status_code=500,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
 
 
-@callback_router.get("/form/{tool_name}", response_class=HTMLResponse)
+@callback_router.get("/form/{tool_name}")
 async def auth_form(
     tool_name: str,
     user_id: str = Query(...),
@@ -597,29 +600,28 @@ async def auth_form(
     
     try:
         form_html = await auth_service.generate_auth_form(user_id, tool_name)
-        response = HTMLResponse(
-            content=form_html, 
-            status_code=200
+        return Response(
+            content=form_html,
+            status_code=200,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
     except ValueError as e:
-        response = HTMLResponse(
-            content=get_error_html(tool_name, str(e)), 
-            status_code=400
+        html_content = get_error_html(tool_name, str(e))
+        return Response(
+            content=html_content,
+            status_code=400,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
     except Exception as e:
-        response = HTMLResponse(
-            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
-            status_code=500
+        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
+        return Response(
+            content=html_content,
+            status_code=500,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
 
 
-@callback_router.post("/form/{tool_name}", response_class=HTMLResponse)
+@callback_router.post("/form/{tool_name}")
 async def handle_auth_form_submit(
     tool_name: str,
     request: Request,
@@ -645,34 +647,34 @@ async def handle_auth_form_submit(
         )
         
         if success:
-            response = HTMLResponse(
-                content=get_success_html(tool_name),
-                status_code=200
+            html_content = get_success_html(tool_name)
+            return Response(
+                content=html_content,
+                status_code=200,
+                headers={"Content-Type": "text/html; charset=utf-8"}
             )
-            response.headers["Content-Type"] = "text/html; charset=utf-8"
-            return response
         else:
-            response = HTMLResponse(
-                content=get_error_html(tool_name, "Failed to save credentials"),
-                status_code=400
+            html_content = get_error_html(tool_name, "Failed to save credentials")
+            return Response(
+                content=html_content,
+                status_code=400,
+                headers={"Content-Type": "text/html; charset=utf-8"}
             )
-            response.headers["Content-Type"] = "text/html; charset=utf-8"
-            return response
             
     except ValueError as e:
-        response = HTMLResponse(
-            content=get_error_html(tool_name, str(e)), 
-            status_code=400
+        html_content = get_error_html(tool_name, str(e))
+        return Response(
+            content=html_content,
+            status_code=400,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
     except Exception as e:
-        response = HTMLResponse(
-            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
-            status_code=500
+        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
+        return Response(
+            content=html_content,
+            status_code=500,
+            headers={"Content-Type": "text/html; charset=utf-8"}
         )
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
 
 
 @router.get("/tools")
