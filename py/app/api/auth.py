@@ -521,47 +521,72 @@ async def auth_callback(
     tool_name: str,
     code: str = Query(...),
     state: str = Query(...),
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Handle OAuth callback - Returns beautiful HTML page"""
     auth_service = AuthService(db)
     
+    # Check if request expects JSON (from edge function/proxy) or HTML (direct browser access)
+    accept_header = request.headers.get("accept", "")
+    is_json_request = "application/json" in accept_header or "supabase.co" in request.headers.get("referer", "")
+    
     try:
         # Handle traditional OAuth callback
         success = await auth_service.handle_callback(tool_name, code, state)
-        if success:
-            html_content = get_success_html(tool_name)
-            return Response(
-                content=html_content,
-                status_code=200,
-                headers={
-                    "Content-Type": "text/html; charset=utf-8",
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0"
+        
+        if is_json_request:
+            # Return JSON for edge functions/proxy
+            if success:
+                return {
+                    "success": True,
+                    "tool_name": tool_name,
+                    "message": f"Successfully authenticated with {tool_name}",
+                    "redirect_html": get_success_html(tool_name)
                 }
-            )
+            else:
+                raise HTTPException(status_code=400, detail="Authentication process failed")
         else:
-            html_content = get_error_html(tool_name, "Authentication process failed")
+            # Return HTML for direct browser access
+            if success:
+                html_content = get_success_html(tool_name)
+                return Response(
+                    content=html_content,
+                    status_code=200,
+                    headers={
+                        "Content-Type": "text/html; charset=utf-8",
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache",
+                        "Expires": "0"
+                    }
+                )
+            else:
+                html_content = get_error_html(tool_name, "Authentication process failed")
+                return Response(
+                    content=html_content,
+                    status_code=400,
+                    headers={"Content-Type": "text/html; charset=utf-8"}
+                )
+    except ValueError as e:
+        if is_json_request:
+            raise HTTPException(status_code=400, detail=str(e))
+        else:
+            html_content = get_error_html(tool_name, str(e))
             return Response(
                 content=html_content,
                 status_code=400,
                 headers={"Content-Type": "text/html; charset=utf-8"}
             )
-    except ValueError as e:
-        html_content = get_error_html(tool_name, str(e))
-        return Response(
-            content=html_content,
-            status_code=400,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
     except Exception as e:
-        html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
-        return Response(
-            content=html_content,
-            status_code=500,
-            headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        if is_json_request:
+            raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+        else:
+            html_content = get_error_html(tool_name, f"Internal error: {str(e)}")
+            return Response(
+                content=html_content,
+                status_code=500,
+                headers={"Content-Type": "text/html; charset=utf-8"}
+            )
 
 
 @callback_router.get("/callback/form/{tool_name}")
