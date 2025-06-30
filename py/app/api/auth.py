@@ -530,13 +530,45 @@ async def auth_callback(
         # Handle traditional OAuth callback
         success = await auth_service.handle_callback(tool_name, code, state)
         if success:
-            return HTMLResponse(content=get_success_html(tool_name), status_code=200, media_type="text/html")
+            return HTMLResponse(
+                content=get_success_html(tool_name), 
+                status_code=200, 
+                media_type="text/html",
+                headers={
+                    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                    "X-Frame-Options": "SAMEORIGIN"
+                }
+            )
         else:
-            return HTMLResponse(content=get_error_html(tool_name, "Authentication process failed"), status_code=400, media_type="text/html")
+            return HTMLResponse(
+                content=get_error_html(tool_name, "Authentication process failed"), 
+                status_code=400, 
+                media_type="text/html",
+                headers={
+                    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                    "X-Frame-Options": "SAMEORIGIN"
+                }
+            )
     except ValueError as e:
-        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400, media_type="text/html")
+        return HTMLResponse(
+            content=get_error_html(tool_name, str(e)), 
+            status_code=400, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500, media_type="text/html")
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
 
 
 @callback_router.get("/callback/form/{tool_name}", response_class=HTMLResponse)
@@ -549,9 +581,25 @@ async def form_auth_callback(
     try:
         # For form-based auth, credentials were already saved in form submit
         # Just return success page
-        return HTMLResponse(content=get_success_html(tool_name), status_code=200, media_type="text/html")
+        return HTMLResponse(
+            content=get_success_html(tool_name), 
+            status_code=200, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500, media_type="text/html")
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
 
 
 @callback_router.get("/form/{tool_name}", response_class=HTMLResponse)
@@ -565,11 +613,35 @@ async def auth_form(
     
     try:
         form_html = await auth_service.generate_auth_form(user_id, tool_name)
-        return HTMLResponse(content=form_html, status_code=200, media_type="text/html")
+        return HTMLResponse(
+            content=form_html, 
+            status_code=200, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
     except ValueError as e:
-        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400, media_type="text/html")
+        return HTMLResponse(
+            content=get_error_html(tool_name, str(e)), 
+            status_code=400, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500, media_type="text/html")
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
 
 
 @callback_router.post("/form/{tool_name}", response_class=HTMLResponse)
@@ -601,19 +673,43 @@ async def handle_auth_form_submit(
             return HTMLResponse(
                 content=get_success_html(tool_name),
                 status_code=200,
-                media_type="text/html"
+                media_type="text/html",
+                headers={
+                    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                    "X-Frame-Options": "SAMEORIGIN"
+                }
             )
         else:
             return HTMLResponse(
                 content=get_error_html(tool_name, "Failed to save credentials"),
                 status_code=400,
-                media_type="text/html"
+                media_type="text/html",
+                headers={
+                    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                    "X-Frame-Options": "SAMEORIGIN"
+                }
             )
             
     except ValueError as e:
-        return HTMLResponse(content=get_error_html(tool_name, str(e)), status_code=400, media_type="text/html")
+        return HTMLResponse(
+            content=get_error_html(tool_name, str(e)), 
+            status_code=400, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
     except Exception as e:
-        return HTMLResponse(content=get_error_html(tool_name, f"Internal error: {str(e)}"), status_code=500, media_type="text/html")
+        return HTMLResponse(
+            content=get_error_html(tool_name, f"Internal error: {str(e)}"), 
+            status_code=500, 
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'",
+                "X-Frame-Options": "SAMEORIGIN"
+            }
+        )
 
 
 @router.get("/tools")
